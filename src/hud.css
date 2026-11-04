@@ -1,4 +1,5 @@
 /* The play view shows only resources, health and the equipped weapon. */
+#kill-reward{position:absolute;top:86px;right:28px;font-size:10px;color:#c6d4af;letter-spacing:.2px;pointer-events:none;text-shadow:0 1px 4px #102018}
 #hud .hud-top{top:22px;left:28px;right:28px;display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
 #hud .debt-box{text-align:left;min-width:0;width:174px}#hud #kill-number{font-size:26px;font-weight:600;line-height:1.1}#hud .goal-number{font-size:11px;letter-spacing:0;color:#c0caba}
 #hud .progress-track{height:2px;margin-top:7px;background:#bccca529}#hud #excalibur-progress{font-size:9px;letter-spacing:.3px;margin-top:9px;color:#b8c7a5;opacity:.75}

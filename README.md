@@ -29,7 +29,7 @@ For the optimized version: `npm run build`, then `npm run preview -- --port 5173
 | 5 / 6 | Shotgun / automatic repeater |
 | 7 / 8 / 9 / 0 | Gravehook / Gravebreaker / Eclipse Sigil / Excalibur |
 | Tab | Owned weapon arsenal; equip from anywhere |
-| F | Weapon special; hold at least 0.6 seconds and release for Excalibur |
+| F | Purchase a nearby dormant structure; otherwise weapon special (hold/release for Excalibur) |
 | B | Inspect and upgrade placed towers |
 | Mouse wheel | Cycle unlocked weapons |
 | R | Reload; reserve ammunition is unlimited |
@@ -39,13 +39,25 @@ For the optimized version: `npm run build`, then `npm run preview -- --port 5173
 
 Sensitivity, volume, graphics and camera shake are adjustable in Settings. Click Resume to capture the mouse again. Low quality reduces render resolution, active goblins, particles and corpses.
 
-The play HUD is deliberately minimal: kills, Shekkles, health, current weapon (with a small magazine count for guns), and a discreet Excalibur soul counter. Controls, region, lifetime earnings, trap/dash readiness and special-ability details are under **Escape → Progress & abilities / Controls**. Charging Excalibur brightens the crosshair. Kill rewards briefly tint the Shekkle counter instead of spawning text. Notifications replace one another rather than stacking.
+The play HUD is deliberately minimal: kills, Shekkles, health, current weapon (with a small magazine count for guns), and a discreet Excalibur soul counter. Controls, region, lifetime earnings, trap/dash readiness and special-ability details are under **Escape → Progress & abilities / Controls**. Charging Excalibur brightens the crosshair. Kill rewards briefly tint the Shekkle counter and combine into one small reward line. Notifications replace one another rather than stacking.
 
 ## Terrain update
 
 The same districts and routes now sit in a sampled landscape: rolling ridges, a shallow southwestern basin, a sunken Gravewood, a three-metre camp plateau and a five-metre keep terrace. Existing buildings keep level foundations; broad slopes connect them. Rocky shelves mark several ridges without blocking the main lanes. Oath Hill and its original sword remain on the southern causeway.
 
 One 192×192 heightfield supplies the rendered ground and the same height samples used by player movement, goblin spawns/fleeing, corpses, particles, tower foundations and projectiles. Paths follow the ground. Bullets and magic cannot pass through a ridge. Towers can be placed on gentle elevated ground but reject steep footprints. Existing tower purchases/levels are retained; a tower obstructed by a new rock landmark searches a nearby clear position rather than losing the purchase.
+
+## Targeted pursuit, purchasing and impact fixes
+
+The current flee speeds are now **5.625 / 5.895 / 5.355m/s** (normal/runner/brute), a further40% cut from the previously shipped9.375 / 9.825 / 8.925 values. Separation was adding velocity after speed selection: a matched70-goblin test measured the old implementation peaking near17.86m/s. Final voluntary movement is now capped after steering/separation, so detection and crowding cannot boost running speed. Physical knockback remains separate. Player walking10.5 and sprinting15 are unchanged.
+
+**Walk up to a dormant structure and press F.** The first bolt turret purchase point is about14m left of the starting position, at(-14,12). It shows **[F] Purchase Turret — 5,000 Shekkles** within4.8m. Insufficient funds leave everything unchanged. A successful purchase activates the existing tower model immediately, saves its purchase-point ID and charges once. Holding F does not repeat-buy. Purchase interaction takes precedence over weapon specials. After purchase, E inspects/upgrades the tower and F resumes its normal weapon-special role. Existing forge/menu placement remains available.
+
+Other dormant structures use the same system: wizard and frost points in the courtyard, ballista at Splinter Camp, storm tower in Gravewood, Soulforge in the keep and spire in the Witchward. Sites can shift slightly to a clear nearby location. Dormant towers do not fire or award rewards. Normal bolts now lead moving targets rather than firing only at their old positions.
+
+Every genuine enemy death still goes through its individual guarded death callback. Nonlethal hits, corpse hits and despawns award nothing. Same-frame group kills are tested at1/5/10/20/50/100 enemies, including ten from one melee cone and the Excalibur/victory thresholds. The HUD now combines recent kills into one small **+10 Shekkles | 10 Goblins Defeated** line instead of separate popups.
+
+Weapon wind-up/contact/recovery uses smooth curves shared with damage timing; sprint/slide pose changes and reload easing are blended. Earthbreaker applies its damage/effects when its hammer animation reaches contact. Ground hits, hammer shockwaves, air slams and Earthbreaker leave dark branching cracks that fade after about1.8 simulated seconds. These are cosmetic decals, not permanent terrain deformation; at most eight exist and their GPU resources are disposed when they expire.
 
 ## Highlands and balance update
 
@@ -61,7 +73,7 @@ The mandated25% reduction makes every straight-line fleeing speed lower than wal
 
 ## Progression
 
-Begin with fists and Rustbite. All other ordinary weapons are permanently purchased at the amber forge to the left of the starting courtyard. There are **no ordinary world weapon pickups**. Every defeated goblin earns exactly one kill and **one Shekkle**. Explosive barrels, collisions, slam attacks, magic, traps and towers all use that same guarded death-credit path. Distant despawns grant nothing. Goblins flee at exactly 75% of their previous fleeing speeds: normal9.375m/s, runner9.825, brute8.925. Walking stays10.5 and sprinting15; sprint pursuit closes much faster. At close range they hesitate and periodically stumble. Stable heading selection avoids nearby obstacles and map edges; panic spreads to nearby goblins.
+Begin with fists and Rustbite. All other ordinary weapons are permanently purchased at the amber forge to the left of the starting courtyard. There are **no ordinary world weapon pickups**. Every defeated goblin earns exactly one kill and **one Shekkle**. Explosive barrels, collisions, slam attacks, magic, traps and towers all use that same guarded death-credit path. Distant despawns grant nothing. Goblins flee at normal5.625m/s, runner5.895, brute5.355 after the latest correction. Walking stays10.5 and sprinting15; sprint pursuit closes much faster. At close range they hesitate and periodically stumble. Stable heading selection avoids nearby obstacles and map edges; panic spreads to nearby goblins.
 
 Buy knockback, damage and magazine upgrades; plant thorn engines with T. Higher trap ranks improve radius, damage, cooldown and lifetime. Bellbreaker clears crowds; the Ruin Covenant turns its shockwave into a 23-metre attack. Enemy density increases with progress. Explore the preserved Gravewood, Splinter Camp, Hollow Keep and old causeway; three hidden caches award one-time Shekkles, never fictitious kills.
 

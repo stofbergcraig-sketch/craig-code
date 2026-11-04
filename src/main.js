@@ -3,7 +3,7 @@ import { createWorld } from './world.js';
 import { Player } from './player.js';
 import { EnemySystem } from './enemies.js';
 import { Effects } from './effects.js';
-import { WeaponView, WEAPONS } from './weapons.js';
+import { WeaponView, WEAPONS, MELEE_TIMINGS } from './weapons.js';
 import { GameAudio } from './audio.js';
 import { Progression } from './progression.js';
 import { GameUI } from './ui.js';
@@ -26,7 +26,7 @@ const keys=new Set();let state='title',started=false,time=0,last=performance.now
 const ammo={shotgun:8,repeater:32};const traps=[];let ui;
 weapon=progress.data.equipped;
 const pendingAttacks=[];let specialCooldown=0,charge=0,charging=false,lastLookX=0,lastLookY=0;
-const player=new Player(camera,world,(name)=>{audio.play(name);if(name==='slam'){enemies.blast(player.position,progress.data.owned.includes('cataclysm')?18:9,160*damageMultiplier(),23*forceMultiplier());fx.ring(player.position,12);fx.burst(player.position,0xffd481,3);shake=.25;}});
+const player=new Player(camera,world,(name)=>{audio.play(name);if(name==='slam'){enemies.blast(player.position,progress.data.owned.includes('cataclysm')?18:9,160*damageMultiplier(),23*forceMultiplier());fx.ring(player.position,12);fx.crack(player.position,7);fx.burst(player.position,0xffd481,3);shake=.25;}});
 const view=new WeaponView(camera);view.setWeapon(weapon);
 const legendary=new LegendarySite(scene,world,progress,fx,audio);
 let lastKillMarker=-1;
@@ -56,9 +56,9 @@ ui=new GameUI(progress,{
   onEquip(id){switchWeapon(id);lockAndPlay();},
   onTowerUpgrade(id){const ok=progress.upgradeTower(id);ui.notify(ok?'Tower upgraded. Runes reinforced.':'Not enough Shekkles or already maximum level.',ok?'unlock':'info');if(ok)audio.play('buy');},
   onPurchase(id){if(id.startsWith('tower:')){defences.begin(id.slice(6));lockAndPlay();return {placing:true};}const result=progress.purchase(id);ui.notify(result.message,result.ok?'unlock':'info');if(result.ok){audio.play('buy');if(WEAPONS[id])switchWeapon(id);ammo.shotgun=Math.max(ammo.shotgun,magazine('shotgun'));ammo.repeater=Math.max(ammo.repeater,magazine('repeater'));}return result;},
-  onReset(){progress.reset();player.respawn();weapon='sword';view.setWeapon(weapon);started=false;enemies.clear();foundSecrets.clear();clearTraps();defences.restore();arcana.clear();legendary.reset();ammo.shotgun=8;ammo.repeater=32;specialCooldown=0;pendingVictory=false;applySettings();setState('title');},
+  onReset(){ui.resetRewards();progress.reset();player.respawn();weapon='sword';view.setWeapon(weapon);started=false;enemies.clear();foundSecrets.clear();clearTraps();defences.restore();arcana.clear();legendary.reset();ammo.shotgun=8;ammo.repeater=32;specialCooldown=0;pendingVictory=false;applySettings();setState('title');},
   onSettings(settings){Object.assign(progress.data.settings,settings);progress.save();applySettings();},
-  onImport(text){const ok=progress.importSave(text);if(ok){switchWeapon(progress.data.equipped);foundSecrets.clear();clearTraps();defences.restore();arcana.clear();legendary.reset();applySettings();ui.notify('Save restored. Your debt remembers.','unlock');}return ok;}
+  onImport(text){const ok=progress.importSave(text);if(ok){ui.resetRewards();switchWeapon(progress.data.equipped);foundSecrets.clear();clearTraps();defences.restore();arcana.clear();legendary.reset();applySettings();ui.notify('Save restored. Your debt remembers.','unlock');}return ok;}
 });
 try{ui.previews=view.thumbnails();}catch{ /* Menus remain usable if a second WebGL context is unavailable. */ }
 applySettings();ui.show('title');
@@ -69,10 +69,11 @@ function attack(quick=false){
   const id=quick?'fists':weapon,w=WEAPONS[id];if(quick?quickTimer>0:attackTimer>0||reloadTimer>0)return;
   if(quick)quickTimer=w.cooldown;else attackTimer=w.cooldown;
   if(w.ammo&&ammo[id]<=0){reload();return;}
-  view.attack();audio.play(id==='shotgun'||id==='repeater'?id:id==='fists'?'punch':'swing');
-  if(w.ammo||id==='eclipse')resolveAttack(id);else pendingAttacks.push({id,delay:w.contact??({fists:.06,sword:.13,axe:.22,hammer:.28}[id]||.13)});
+  view.attack(quick);audio.play(id==='shotgun'||id==='repeater'?id:id==='fists'?'punch':'swing');
+  if(w.ammo||id==='eclipse')resolveAttack(id);else pendingAttacks.push({id,delay:MELEE_TIMINGS[id].contact});
 }
 function resolveAttack(id){
+  if(id==='earthbreaker'){enemies.blast(player.position,22,700*damageMultiplier(),48);fx.ring(player.position,22,0x9e87bc);fx.crack(player.position,11);fx.burst(player.position,0x7b718c,4);audio.play('slam');shake=.35;return;}
   const w=WEAPONS[id];
   const origin=camera.position.clone(),direction=player.forward();let hits=0;
   if(id==='eclipse'){
@@ -84,8 +85,9 @@ function resolveAttack(id){
   }else{
     hits=enemies.hitCone(origin,direction,w.range,w.cosAngle??.2,w.damage*damageMultiplier(),w.force*forceMultiplier());
     hitBarrels(origin,direction,w.range,w.damage);
+    const groundDistance=world.groundRayDistance(origin,direction,w.range),groundHit=direction.y<-.2&&groundDistance<w.range-.05;if(groundHit){const contact=origin.clone().addScaledVector(direction,groundDistance);fx.crack(contact,id==='gravebreaker'?6:id==='hammer'?4:id==='fists'?.8:2);fx.burst(contact,0x817962,1);audio.play('hit',.45);}
     if(id!=='fists'){const center=origin.clone().addScaledVector(direction,Math.min(4,w.range*.6));fx.tracer(center.clone().add(new THREE.Vector3(-1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0),player.yaw)),center.clone().add(new THREE.Vector3(1,-.3,0).applyAxisAngle(new THREE.Vector3(0,1,0),player.yaw)),id==='excalibur'?0xd5efaf:0x90ae9d);}
-    if(id==='hammer'){const p=player.position.clone().addScaledVector(new THREE.Vector3(direction.x,0,direction.z).normalize(),4);const cat=progress.data.owned.includes('cataclysm');hits+=enemies.blast(p,cat?23:7,(cat?450:100)*damageMultiplier(),(cat?34:22)*forceMultiplier());fx.ring(p,cat?23:7,cat?0xaee75b:0xffbd61);}
+    if(id==='hammer'){const p=player.position.clone().addScaledVector(new THREE.Vector3(direction.x,0,direction.z).normalize(),4);const cat=progress.data.owned.includes('cataclysm');hits+=enemies.blast(p,cat?23:7,(cat?450:100)*damageMultiplier(),(cat?34:22)*forceMultiplier());fx.ring(p,cat?23:7,cat?0xaee75b:0xffbd61);if(!groundHit)fx.crack(p,cat?8:4);}
   }
   if(hits){audio.play('hit',Math.min(1,hits*.18+.5));ui.hit();hitStop=w.ammo?.016:.045;shake=Math.max(shake,.11);}
 }
@@ -97,7 +99,7 @@ function specialAttack(){
   if(weapon==='gravehook'){
     const target=arcana.target(origin,26,dir,.82);arcana.fire(origin,dir,{target,speed:58,damage:12,force:0,hookOrigin:origin.clone(),onHit(e){e.stun=1.15;e.velocity.copy(player.position).sub(e.position).normalize().multiplyScalar(23);e.velocity.y=4;fx.tracer(origin,e.position.clone().setY(1),0xa2c7ab);}});audio.play('hook');
   }else if(weapon==='gravebreaker'){
-    enemies.blast(player.position,22,700*damageMultiplier(),48);fx.ring(player.position,22,0x9e87bc);fx.burst(player.position,0x7b718c,4);audio.play('slam');shake=.35;
+    pendingAttacks.push({id:'earthbreaker',delay:MELEE_TIMINGS.gravebreaker.contact});
   }else if(weapon==='eclipse'){
     const seen=new Set();for(let i=0;i<10;i++){const e=arcana.target(origin,48,null,-1,seen);if(e)seen.add(e.id);const direction=e?e.position.clone().add(new THREE.Vector3(0,.8,0)).sub(origin).normalize():dir.clone().applyAxisAngle(new THREE.Vector3(0,1,0),(i-4.5)*.055);arcana.fire(origin,direction,{target:e,damage:200*damageMultiplier(),bounce:1,color:0xc2a0ed});}fx.ring(player.position,4,0xbda0d9);audio.play('magic');
   }else if(weapon==='excalibur'){
@@ -114,7 +116,7 @@ function deployTrap(){const level=progress.data.upgrades.trap||0;if(!level){ui.n
 const foundSecrets=new Set();
 function interact(){if(legendary.near(player)){if(!legendary.interact())ui.notify(legendary.prompt(),'info');return;}if(defences.nearest(player.position)){setState('towers');return;}const shop=world.shops.find(s=>Math.hypot(s.x-player.position.x,s.z-player.position.z)<6);if(shop){setState('shop');return;}ui.notify('Find the amber forge to buy weapons and upgrades.','info');}
 const slots=['fists','sword','axe','hammer','shotgun','repeater','gravehook','gravebreaker','eclipse','excalibur'];
-document.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement)return;if(['Space','Tab','ControlLeft','ControlRight'].includes(e.code))e.preventDefault();if(e.code==='Escape'){defences.cancel();if(state==='playing')setState('pause');else if(state!=='title'&&state!=='death')setState('pause');return;}if(e.code==='Tab'&&state==='arsenal'){lockAndPlay();return;}if(state!=='playing')return;keys.add(e.code);if(e.repeat)return;if(e.code==='Tab'){setState('arsenal');return;}if(e.code==='KeyB'){setState('towers');return;}if(e.code==='Space')player.jump();if(e.code==='KeyQ')player.dash(keys);if(e.code==='ControlLeft'||e.code==='ControlRight')player.slide();if(e.code==='KeyR')reload();if(e.code==='KeyT')deployTrap();if(e.code==='KeyF')specialAttack();if(e.code==='KeyE')interact();if(e.code.startsWith('Digit'))switchWeapon(slots[(Number(e.code.slice(5))+9)%10]);});
+document.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement)return;if(['Space','Tab','ControlLeft','ControlRight'].includes(e.code))e.preventDefault();if(e.code==='Escape'){defences.cancel();if(state==='playing')setState('pause');else if(state!=='title'&&state!=='death')setState('pause');return;}if(e.code==='Tab'&&state==='arsenal'){lockAndPlay();return;}if(state!=='playing')return;keys.add(e.code);if(e.repeat)return;if(e.code==='Tab'){setState('arsenal');return;}if(e.code==='KeyB'){setState('towers');return;}if(e.code==='Space')player.jump();if(e.code==='KeyQ')player.dash(keys);if(e.code==='ControlLeft'||e.code==='ControlRight')player.slide();if(e.code==='KeyR')reload();if(e.code==='KeyT')deployTrap();if(e.code==='KeyF'){const pad=!defences.pending&&defences.nearPurchase(player.position);if(pad){charging=false;charge=0;const result=defences.purchasePad(pad.id);ui.notify(result.message,result.ok?'unlock':'info');}else specialAttack();}if(e.code==='KeyE')interact();if(e.code.startsWith('Digit'))switchWeapon(slots[(Number(e.code.slice(5))+9)%10]);});
 document.addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='KeyF'&&charging){if(charge>=.6)specialAttack();else{charging=false;charge=0;}}});
 document.addEventListener('mousemove',e=>{if(state==='playing'&&document.pointerLockElement){lastLookX=e.movementX*.002;lastLookY=e.movementY*.002;player.look(e.movementX,e.movementY,progress.data.settings.sensitivity);}});
 renderer.domElement.addEventListener('mousedown',e=>{if(state!=='playing')return;if(!document.pointerLockElement){renderer.domElement.requestPointerLock()?.catch(()=>{});return;}if(defences.pending){if(e.button===0){if(!defences.place())ui.notify('Placement blocked or not enough Shekkles.','info');}else if(e.button===2)defences.cancel();return;}if(e.button===0){mouseDown=true;attack();}if(e.button===2)attack(true);});
@@ -149,8 +151,9 @@ function frame(now){requestAnimationFrame(frame);let dt=Math.min(.04,(now-last)/
   fx.update(dt);shake=Math.max(0,shake-dt);if(state==='playing'&&shake>0){const amount=shake*progress.data.settings.shake*.025;camera.rotation.z+=(Math.random()-.5)*amount;camera.position.y+=(Math.random()-.5)*amount;}
   view.update(dt,{speed:Math.hypot(player.velocity.x,player.velocity.z),grounded:player.grounded,sprinting:keys.has('ShiftLeft'),sliding:player.slideTime>0,time,lookX:lastLookX,lookY:lastLookY});lastLookX*=.6;lastLookY*=.6;audio.update?.(dt,state==='playing'?Math.hypot(player.velocity.x,player.velocity.z):0,player.grounded);
   renderer.render(scene,camera);if(started&&state!=='title')view.render?.(renderer);
+  const purchasePad=!defences.pending&&defences.nearPurchase(player.position);
   const nearShop=world.shops.some(s=>Math.hypot(s.x-player.position.x,s.z-player.position.z)<6);
-  ui.update({health:player.health,weapon:WEAPONS[weapon].name,weaponId:weapon,ammo:WEAPONS[weapon].ammo?ammo[weapon]:null,reserve:WEAPONS[weapon].ammo?'∞':null,kills:progress.data.kills,coins:progress.data.coins,zone:legendary.near(player)?'OATH HILL':world.zoneAt(player.position.x,player.position.z),dash:player.dashCooldown,trapCooldown,streak,alive:enemies.aliveCount,interact:legendary.near(player)?(progress.data.owned.includes('excalibur')?'Excalibur':progress.data.kills<20000?'Excalibur · '+progress.data.kills.toLocaleString()+' / 20,000':'Claim Excalibur'):nearShop?'Forge':defences.nearest(player.position)?'Tower':undefined,special:WEAPONS[weapon].special?`F · ${WEAPONS[weapon].special} · ${charging?Math.round(charge*100)+'%':specialCooldown>0?specialCooldown.toFixed(1)+'s':weapon==='excalibur'?'HOLD TO CHARGE':'READY'}`:'',placement:defences.pending?`${TOWER_TYPES[defences.pending].name} · ${defences.valid?'LMB place':'Blocked'} · RMB cancel`:null,charging,charge,reloading:reloadTimer>0});
+  ui.update({health:player.health,weapon:WEAPONS[weapon].name,weaponId:weapon,ammo:WEAPONS[weapon].ammo?ammo[weapon]:null,reserve:WEAPONS[weapon].ammo?'∞':null,kills:progress.data.kills,coins:progress.data.coins,zone:legendary.near(player)?'OATH HILL':world.zoneAt(player.position.x,player.position.z),dash:player.dashCooldown,trapCooldown,streak,alive:enemies.aliveCount,interactKey:purchasePad?'F':'E',interact:purchasePad?`Purchase ${purchasePad.type==='bolt'?'Turret':TOWER_TYPES[purchasePad.type].name} — ${TOWER_TYPES[purchasePad.type].cost.toLocaleString()} Shekkles`:legendary.near(player)?(progress.data.owned.includes('excalibur')?'Excalibur':progress.data.kills<20000?'Excalibur · '+progress.data.kills.toLocaleString()+' / 20,000':'Claim Excalibur'):nearShop?'Forge':defences.nearest(player.position)?'Tower':undefined,special:WEAPONS[weapon].special?`F · ${WEAPONS[weapon].special} · ${charging?Math.round(charge*100)+'%':specialCooldown>0?specialCooldown.toFixed(1)+'s':weapon==='excalibur'?'HOLD TO CHARGE':'READY'}`:'',placement:defences.pending?`${TOWER_TYPES[defences.pending].name} · ${defences.valid?'LMB place':'Blocked'} · RMB cancel`:null,charging,charge,reloading:reloadTimer>0});
   saveTimer+=dt;if(saveTimer>5){progress.save();saveTimer=0;}
 }
 requestAnimationFrame(frame);

@@ -268,7 +268,7 @@ export class EnemySystem {
           }
         }
         let vx=e.fleeX,vz=e.fleeZ;
-        const speed=(e.stumble>0?1.8*FLEE_SPEED_MULTIPLIER:e.panic>0?(distance<2.5?7.5*FLEE_SPEED_MULTIPLIER:FLEE_SPEEDS[e.type]):1.5)*e.slowFactor;
+        const speed=(e.stumble>0?1.35*FLEE_SPEED_MULTIPLIER:e.panic>0?(distance<2.5?5.625*FLEE_SPEED_MULTIPLIER:FLEE_SPEEDS[e.type]):1.5)*e.slowFactor;
         e.velocity.x = THREE.MathUtils.damp(e.velocity.x,vx*speed,8,dt); e.velocity.z = THREE.MathUtils.damp(e.velocity.z,vz*speed,8,dt);
         // Tiny local repulsion keeps the crowd readable without an O(n²) solve.
         if ((e.id & 1) === (Math.floor(time * 60) & 1)) this._near(p, other => {
@@ -281,6 +281,10 @@ export class EnemySystem {
             e.velocity.z += oz / Math.sqrt(d2) * push;
           }
         });
+        // Repulsion and recovering velocity must never boost voluntary fleeing.
+        // Launched/stunned bodies use the separate knockback branch above.
+        const actualSpeed=Math.hypot(e.velocity.x,e.velocity.z);
+        if(actualSpeed>speed){e.velocity.x*=speed/actualSpeed;e.velocity.z*=speed/actualSpeed;}
         this._move(e, dt);
         const targetYaw=Math.atan2(e.velocity.x,e.velocity.z);e.yaw+=Math.atan2(Math.sin(targetYaw-e.yaw),Math.cos(targetYaw-e.yaw))*Math.min(1,dt*12);
         if (distance < 1.55 && Math.abs(player.position.y - p.y) < 1.7 && e.attack <= 0 && this._hitCooldown <= 0) {

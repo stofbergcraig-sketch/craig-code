@@ -22,7 +22,7 @@ export class GameUI {
           <div class="brass-box"><span class="tiny-label">SHEKKLES</span><b>◈ <span id="coin-number">0</span></b></div>
         </header>
         <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div><div id="hitmarker">×</div>
-        <div id="interact-prompt" hidden></div><div id="placement-prompt" hidden></div>
+        <div id="interact-prompt" hidden></div><div id="placement-prompt" hidden></div><div id="kill-reward" aria-live="off" hidden></div>
         <footer class="hud-bottom"><div class="vital-box"><div class="health-row"><span class="health-icon">+</span><b id="health-number">100</b></div><div class="health-track"><i id="health-bar"></i></div></div><div class="weapon-box"><b id="weapon-name">Rustbite</b><div id="ammo-display" hidden></div></div></footer>
       </div>
       <div id="notifications" aria-live="polite"></div>
@@ -102,7 +102,7 @@ export class GameUI {
       <div class="save-buttons"><button data-action="export">Export save</button><button data-action="import">Import save</button><button class="danger-link" data-action="reset">Reset progress</button></div></section>`;
   }
   controlsMarkup() {
-    return `<div class="controls-grid"><span><kbd>W A S D</kbd> Move</span><span><kbd>MOUSE</kbd> Look</span><span><kbd>LMB</kbd> Attack</span><span><kbd>RMB</kbd> Quick punch</span><span><kbd>SHIFT</kbd> Sprint</span><span><kbd>SPACE</kbd> Double jump</span><span><kbd>Q</kbd> Dash</span><span><kbd>CTRL</kbd> Slide / air slam</span><span><kbd>R</kbd> Reload</span><span><kbd>1–0</kbd> Switch weapon</span><span><kbd>F</kbd> Special (hold for Excalibur)</span><span><kbd>TAB</kbd> Weapon arsenal</span><span><kbd>B</kbd> Inspect towers</span><span><kbd>T</kbd> Plant trap</span><span><kbd>E</kbd> Forge / interact</span></div>`;
+    return `<div class="controls-grid"><span><kbd>W A S D</kbd> Move</span><span><kbd>MOUSE</kbd> Look</span><span><kbd>LMB</kbd> Attack</span><span><kbd>RMB</kbd> Quick punch</span><span><kbd>SHIFT</kbd> Sprint</span><span><kbd>SPACE</kbd> Double jump</span><span><kbd>Q</kbd> Dash</span><span><kbd>CTRL</kbd> Slide / air slam</span><span><kbd>R</kbd> Reload</span><span><kbd>1–0</kbd> Switch weapon</span><span><kbd>F</kbd> Purchase nearby / special</span><span><kbd>TAB</kbd> Weapon arsenal</span><span><kbd>B</kbd> Inspect towers</span><span><kbd>T</kbd> Plant trap</span><span><kbd>E</kbd> Forge / interact</span></div>`;
   }
   saveNote() {
     return this.progression.storageStatus === 'unavailable' ? '<span class="save-warning">Browser saving is unavailable. Export a backup before leaving.</span>' : this.progression.storageStatus === 'recovered' ? '<span class="save-warning">An unreadable save was recovered with fresh progress.</span>' : 'Auto-saved in this browser, on this device. Export a backup to take it with you.';
@@ -136,7 +136,8 @@ export class GameUI {
     }
   }
   previewMarkup(id){const src=this.previews?.[id];return src?`<img class="weapon-preview" src="${src}" alt="${WEAPONS[id].name} weapon model">`:'';}
-  reward(){this.rewardUntil=performance.now()+180;}
+  reward(count=1){const now=performance.now();if(!this.rewardBatchStart||now-this.rewardBatchStart>300){this.rewardCount=0;this.rewardBatchStart=now;}this.rewardCount=(this.rewardCount||0)+count;this.rewardUntil=now+1050;}
+  resetRewards(){this.rewardCount=0;this.rewardUntil=0;this.rewardBatchStart=0;}
   progressMarkup(){
     const d=this.progression.data,s=this.last,w=WEAPONS[d.equipped];
     return `<details class="progress-details"><summary>Progress & abilities</summary><dl><dt>Region</dt><dd>${s.zone||'The Sunken March'}</dd><dt>Shekkles earned</dt><dd>${format(d.totalEarned)}</dd><dt>Excalibur</dt><dd>${d.owned.includes('excalibur')?'Claimed':format(Math.min(20000,d.kills))+' / 20,000 souls · Oath Hill'}</dd><dt>Defences</dt><dd>${d.towers.length} / 16 placed · B to inspect</dd><dt>Dash</dt><dd>Q · ${s.dash>0?s.dash.toFixed(1)+'s':'Ready'}</dd><dt>Thorn engine</dt><dd>${d.upgrades.trap?'T · '+(s.trapCooldown>0?s.trapCooldown.toFixed(1)+'s':'Ready'):'Buy at the amber forge'}</dd><dt>Weapon special</dt><dd>${w.special?s.special||'F · '+w.special:'None · RMB quick punch'}</dd></dl></details>`;
@@ -146,6 +147,7 @@ export class GameUI {
     const write=(id,value)=>{const el=this.root.querySelector('#'+id);if(el&&el.textContent!==String(value))el.textContent=value;};
     write('kill-number',format(s.kills??this.progression.data.kills));write('coin-number',format(s.coins??this.progression.data.coins));
     this.root.querySelector('.brass-box').classList.toggle('reward',performance.now()<(this.rewardUntil||0));
+    const reward=this.root.querySelector('#kill-reward');reward.hidden=performance.now()>=(this.rewardUntil||0);if(!reward.hidden)write('kill-reward','+'+format(this.rewardCount)+' Shekkles | '+format(this.rewardCount)+(this.rewardCount===1?' Goblin Defeated':' Goblins Defeated'));
     write('health-number',Math.max(0,Math.ceil(s.health??100)));write('weapon-name',weaponNames[s.weaponId]||s.weapon||'Rustbite');
     const excal=this.root.querySelector('#excalibur-progress');excal.hidden=this.progression.data.owned.includes('excalibur');write('excalibur-progress','✦ '+format(Math.min(20000,s.kills||0))+' / 20,000');
     const ammo=this.root.querySelector('#ammo-display');ammo.hidden=s.ammo===undefined||s.ammo===null;
@@ -154,7 +156,7 @@ export class GameUI {
     this.root.querySelector('.vital-box').classList.toggle('critical',(s.health??100)<30);
     this.root.querySelector('#debt-progress').style.width=Math.min(100,(s.kills??0)/GOAL*100)+'%';
     const interact=this.root.querySelector('#interact-prompt');interact.hidden=!s.interact||!!s.placement;
-    if(s.interact&&this.lastInteract!==s.interact){interact.replaceChildren();const key=document.createElement('kbd');key.textContent='E';interact.append(key,document.createTextNode(' '+s.interact));this.lastInteract=s.interact;}
+    const promptKey=s.interactKey||'E';if(s.interact&&this.lastInteract!==promptKey+s.interact){interact.replaceChildren();const key=document.createElement('kbd');key.textContent=promptKey;interact.append(key,document.createTextNode(' '+s.interact));this.lastInteract=promptKey+s.interact;}
     const place=this.root.querySelector('#placement-prompt');place.hidden=!s.placement;if(s.placement)place.textContent=s.placement;
     const crosshair=this.root.querySelector('#crosshair');crosshair.classList.toggle('charging',!!s.charging);crosshair.style.setProperty('--charge',s.charge||0);
   }

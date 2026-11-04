@@ -16,6 +16,12 @@ export const WEAPONS = {
 
 const mat = (color, roughness = .65, metalness = .15) => new THREE.MeshStandardMaterial({ color, roughness, metalness, flatShading: true });
 export const VIEW_SCALES=Object.freeze({sword:.8,axe:.8,hammer:.8,gravebreaker:.8,excalibur:.8});
+const smooth=t=>{t=THREE.MathUtils.clamp(t,0,1);return t*t*t*(t*(t*6-15)+10);};
+export const MELEE_TIMINGS=Object.freeze({fists:{duration:.27,contact:.06},sword:{duration:.30,contact:.13},axe:{duration:.53,contact:.22},hammer:{duration:.68,contact:.28},gravehook:{duration:.27,contact:.1},gravebreaker:{duration:.8,contact:.28},excalibur:{duration:.3,contact:.12}});
+export function attackPose(age,duration,contact){
+  const t=THREE.MathUtils.clamp(age/duration,0,1),hit=contact/duration,windPeak=hit*.45;
+  return {wind:t<windPeak?smooth(t/windPeak):1-smooth((t-windPeak)/(hit-windPeak)),slash:t<windPeak?0:t<hit?smooth((t-windPeak)/(hit-windPeak)):1-smooth((t-hit)/(1-hit))};
+}
 const PALETTE = {
   iron: mat(0x738e91, .34, .7), lightIron: mat(0xb5c4b6, .35, .6), darkIron: mat(0x253b3c, .53, .6),
   edge: mat(0xdce5cf, .25, .7), gold: mat(0xb98d48, .42, .65), leather: mat(0x553b30, .8),
@@ -202,6 +208,7 @@ export class WeaponView {
     const light = new THREE.DirectionalLight(0xffd8a3, 3.2); light.position.set(-2, 4, 4); this.scene.add(light);
     const rim = new THREE.DirectionalLight(0x70e8ce, 1.8); rim.position.set(2, 1, -3); this.scene.add(rim);
     this.root = new THREE.Group(); this.scene.add(this.root);
+    this.quickRoot=new THREE.Group();this.quickFists=buildFists();this.quickFists.right.visible=false;this.quickFists.left.position.set(0,0,-.1);this.quickRoot.add(this.quickFists.group);this.quickRoot.position.set(-.28,-.32,-.55);this.quickRoot.visible=false;this.scene.add(this.quickRoot);this.punchAge=10;
     this.models = { fists: buildFists(), sword: buildSword(), axe: buildAxe(), hammer: buildHammer(), shotgun: buildGun(false), repeater: buildGun(true),gravehook:buildHook(),gravebreaker:buildGravebreaker(),eclipse:buildSigil(),excalibur:buildLegendarySword() };
     for (const [id,model] of Object.entries(this.models)) {model.group.scale.multiplyScalar(VIEW_SCALES[id]||1);this.root.add(model.group); model.group.visible = false; }
     this.id = 'fists'; this.age = 10; this.switchAge = 1; this.reloadAge = 0; this.reloadDuration = 0; this.recoil = 0; this.alternate = false;
@@ -211,8 +218,10 @@ export class WeaponView {
     if (!this.models[id]) return;
     for (const [name, model] of Object.entries(this.models)) model.group.visible = name === id;
     this.id = id; this.age = 10; this.switchAge = 0; this.reloadDuration = 0; this.recoil = 0;
+    this.punchAge=10;this.quickRoot.visible=false;
   }
-  attack() {
+  attack(quick=false) {
+    if(quick&&this.id!=='fists'){this.punchAge=0;return;}
     this.age = 0; this.recoil = this.id === 'shotgun' ? 1 : this.id === 'repeater' ? .44 : 0;
     this.alternate = !this.alternate;
     this.combo=((this.combo||0)+1)%3;
@@ -228,10 +237,14 @@ export class WeaponView {
   update(dt, state = {}) {
     const { speed = 0, grounded = true, sprinting = false, sliding = false, time = 0, lookX = 0, lookY = 0 } = state;
     this.age += dt; this.switchAge += dt; this.reloadAge += dt;
+    this.punchAge+=dt;this.quickRoot.visible=this.punchAge<MELEE_TIMINGS.fists.duration;const jab=attackPose(this.punchAge,MELEE_TIMINGS.fists.duration,MELEE_TIMINGS.fists.contact).slash;this.quickFists.left.position.set(jab*.12,jab*.1,-.1-jab*.45);this.quickRoot.rotation.z=-jab*.25;
     this.specialAge=(this.specialAge??10)+dt;
     this.recoil = THREE.MathUtils.damp(this.recoil, 0, 14, dt);
     this.bobPhase += dt * (grounded ? Math.min(speed, 20) * .75 : 1.5);
-    const bob = grounded ? Math.min(speed / 15, 1) : .1;
+    this.groundBlend=THREE.MathUtils.damp(this.groundBlend??1,grounded?1:.1,12,dt);
+    this.sprintBlend=THREE.MathUtils.damp(this.sprintBlend||0,sprinting&&speed>5?1:0,12,dt);
+    this.slideBlend=THREE.MathUtils.damp(this.slideBlend||0,sliding?1:0,14,dt);
+    const bob = Math.min(speed / 15, 1)*this.groundBlend;
     const gun = this.id === 'shotgun' || this.id === 'repeater';
     const baseX = gun ? .28 : .34;
     this.sway.x = THREE.MathUtils.damp(this.sway.x, THREE.MathUtils.clamp(lookX, -.08, .08), 8, dt);
@@ -239,8 +252,8 @@ export class WeaponView {
     this.root.position.set(baseX + Math.sin(this.bobPhase) * .015 * bob - this.sway.x, -.34 + Math.cos(this.bobPhase * 2) * .012 * bob - this.sway.y, -.58);
     if(VIEW_SCALES[this.id]){this.root.position.x+=.025;this.root.position.y-=.035;}
     this.root.rotation.set(.015 * Math.cos(time * 1.8), 0, .015 * Math.sin(time * 1.4));
-    if (sliding) { this.root.position.y -= .06; this.root.rotation.z -= .12; }
-    if (sprinting && speed > 5) { this.root.position.y -= .055+Math.abs(Math.sin(this.bobPhase))*.025; this.root.rotation.z += .14;this.root.rotation.x+=Math.cos(this.bobPhase)*.025; }
+    this.root.position.y-=.06*this.slideBlend;this.root.rotation.z-=.12*this.slideBlend;
+    this.root.position.y-=(.055+Math.abs(Math.sin(this.bobPhase))*.025)*this.sprintBlend;this.root.rotation.z+=.14*this.sprintBlend;this.root.rotation.x+=Math.cos(this.bobPhase)*.025*this.sprintBlend;
     this.root.position.y -= Math.max(0, 1 - this.switchAge / .2) ** 2 * .42;
     const current = this.models[this.id];
     if (gun) {
@@ -257,7 +270,7 @@ export class WeaponView {
       if (current.magazine) current.magazine.position.y = -.135;
       if (reloading) {
         const progress = this.reloadAge / this.reloadDuration;
-        const ease = Math.sin(Math.PI * progress) ** .65;
+        const ease = Math.sin(Math.PI * smooth(progress));
         this.root.rotation.z += ease * .63;
         this.root.rotation.y += ease * .2;
         this.root.position.y -= ease * .12;
@@ -271,9 +284,9 @@ export class WeaponView {
     } else if(this.id==='eclipse'){
       current.rings.forEach((ring,i)=>{ring.rotation.z=time*(i%2?-1:1)*(1+i*.4);ring.rotation.y=Math.sin(time+i)*.16;ring.scale.setScalar(1+Math.max(0,1-this.specialAge/.6)*.45);});this.root.position.z+=Math.sin(Math.min(1,this.age/.23)*Math.PI)*.1;
     } else {
-      const duration = { fists: .27, sword: .30, axe: .53, hammer: .68,gravehook:.27,gravebreaker:.8,excalibur:.3 }[this.id];
+      const {duration,contact}=MELEE_TIMINGS[this.id];
       const progress = Math.min(1, this.age / duration);
-      const swing = Math.sin(progress * Math.PI) ** .75;
+      const {wind,slash}=attackPose(this.age,duration,contact),swing=slash;
       if (this.id === 'fists') {
         for (const side of ['left', 'right']) {
           const fist = current[side]; fist.position.z = side === 'left' ? -.1 : -.05;
@@ -284,9 +297,7 @@ export class WeaponView {
         this.root.position.x += swing * (this.alternate ? -.1 : .1);
       } else {
         const heavy = ['hammer','gravebreaker','axe'].includes(this.id),sign=this.combo===1?-1:1;
-        // Wind-up, fast contact at ~40%, and follow-through are separate phases.
-        const wind=progress<.25?Math.sin(progress/.25*Math.PI):0;
-        const slash=progress<.25?0:Math.sin((progress-.25)/.75*Math.PI);
+        // Smooth wind-up/contact/recovery, peaking at the actual damage time.
         const thrust=!heavy&&this.combo===2;
         this.root.rotation.z+=wind*-.22*sign+slash*(heavy?.9:1.5)*sign;
         this.root.rotation.x+=wind*.2-slash*(heavy&&this.combo===2?1.45:.55);

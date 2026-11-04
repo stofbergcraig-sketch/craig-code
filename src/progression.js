@@ -59,7 +59,7 @@ function sanitize(raw) {
   data.owned = [...new Set(['fists', 'sword', ...(Array.isArray(raw.owned) ? raw.owned.filter(x => weapons.has(x)) : [])])];
   if(data.kills<EXCALIBUR_KILLS)data.owned=data.owned.filter(id=>id!=='excalibur');
   data.equipped=data.owned.includes(raw.equipped)&&raw.equipped!=='cataclysm'?raw.equipped:'sword';
-  data.towers=(Array.isArray(raw.towers)?raw.towers:[]).slice(0,16).filter(t=>t&&TOWER_TYPES[t.type]&&Number.isFinite(t.x)&&Number.isFinite(t.z)&&Math.abs(t.x)<=BUILD_LIMIT&&Math.abs(t.z)<=BUILD_LIMIT).map((t,i)=>({id:i+1,type:t.type,x:t.x,z:t.z,level:Math.floor(finite(t.level,1,1,3))}));
+  data.towers=(Array.isArray(raw.towers)?raw.towers:[]).slice(0,16).filter(t=>t&&TOWER_TYPES[t.type]&&Number.isFinite(t.x)&&Number.isFinite(t.z)&&Math.abs(t.x)<=BUILD_LIMIT&&Math.abs(t.z)<=BUILD_LIMIT).map((t,i)=>({id:i+1,type:t.type,x:t.x,z:t.z,level:Math.floor(finite(t.level,1,1,3)),...(typeof t.padId==='string'&&/^[a-z-]{1,50}$/.test(t.padId)?{padId:t.padId}:{})}));
   for (const id of Object.keys(data.upgrades)) {
     const max = SHOP_ITEMS.find(x => x.id === id).max;
     data.upgrades[id] = Math.floor(finite(raw.upgrades?.[id], 0, 0, max));
@@ -133,10 +133,10 @@ export class Progression {
     if(this.data.kills<EXCALIBUR_KILLS||this.data.owned.includes('excalibur'))return false;
     this.data.owned.push('excalibur');this.data.equipped='excalibur';this.save();return true;
   }
-  placeTower(type,x,z){
+  placeTower(type,x,z,padId=null){
     const def=TOWER_TYPES[type];
-    if(!def||this.data.coins<def.cost||this.data.towers.length>=16||!Number.isFinite(x)||!Number.isFinite(z)||Math.abs(x)>BUILD_LIMIT||Math.abs(z)>BUILD_LIMIT)return null;
-    this.data.coins-=def.cost;const tower={id:Math.max(0,...this.data.towers.map(t=>t.id))+1,type,x,z,level:1};this.data.towers.push(tower);this.save();return tower;
+    if(!def||this.data.coins<def.cost||this.data.towers.length>=16||!Number.isFinite(x)||!Number.isFinite(z)||Math.abs(x)>BUILD_LIMIT||Math.abs(z)>BUILD_LIMIT||padId&&this.data.towers.some(t=>t.padId===padId))return null;
+    this.data.coins-=def.cost;const tower={id:Math.max(0,...this.data.towers.map(t=>t.id))+1,type,x,z,level:1,...(padId?{padId}:{})};this.data.towers.push(tower);this.save();return tower;
   }
   towerUpgradeCost(tower){return tower&&tower.level<3?Math.round(TOWER_TYPES[tower.type].cost*.55*tower.level):Infinity;}
   upgradeTower(id){const t=this.data.towers.find(t=>t.id===id),cost=this.towerUpgradeCost(t);if(!t||this.data.coins<cost||t.level>=3)return false;this.data.coins-=cost;t.level++;this.save();return true;}

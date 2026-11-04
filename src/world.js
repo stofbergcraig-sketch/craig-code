@@ -343,6 +343,7 @@ export function createWorld(scene) {
   for(const object of scene.children)if(!initialObjects.has(object)&&!object.userData.sky&&!object.userData.anchored&&!object.userData.terrainSurface)object.position.y+=terrain.heightAt(object.position.x,object.position.z);
   return {
     colliders,spawnPoints,shops,secrets,barrels,terrain,bounds:MAP_LIMIT,heightAt:terrain.heightAt,slopeAt:terrain.slopeAt,groundRayDistance:terrain.rayDistance,
+    purchasePads:[{id:'courtyard-bolt',type:'bolt',x:-14,z:12},{id:'courtyard-wizard',type:'wizard',x:10,z:-7},{id:'courtyard-frost',type:'frost',x:-16,z:-9},{id:'camp-ballista',type:'ballista',x:58,z:1},{id:'gravewood-storm',type:'storm',x:-48,z:12},{id:'keep-soulforge',type:'soulforge',x:0,z:-84},{id:'witchward-spire',type:'spire',x:134,z:34}],
     zoneAt(x,z) { if(z<-110)return 'BROKEN CROWN RIDGE';if(x<-108)return 'THE ASHEN MARCH';if(x>110)return 'THE WITCHWARD';if(z>100)return 'THE OATH HIGHLANDS';if(z < -47)return 'THE HOLLOW KEEP';if(x < -29)return 'GRAVEWOOD';if(x > 30)return 'SPLINTER CAMP';if(z>38)return 'THE OLD CAUSEWAY';return 'DEBTOR’S COURTYARD'; },
     update(dt,time) {
       for(const a of animated) {
