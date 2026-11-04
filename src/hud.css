@@ -1,0 +1,14 @@
+/* The play view shows only resources, health and the equipped weapon. */
+#hud .hud-top{top:22px;left:28px;right:28px;display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
+#hud .debt-box{text-align:left;min-width:0;width:174px}#hud #kill-number{font-size:26px;font-weight:600;line-height:1.1}#hud .goal-number{font-size:11px;letter-spacing:0;color:#c0caba}
+#hud .progress-track{height:2px;margin-top:7px;background:#bccca529}#hud #excalibur-progress{font-size:9px;letter-spacing:.3px;margin-top:9px;color:#b8c7a5;opacity:.75}
+#hud .brass-box{min-width:0;text-align:right}#hud .brass-box b{display:block;margin-top:4px;font-size:23px;font-weight:500;color:var(--cream);transition:color .15s}#hud .brass-box.reward b{color:var(--lime)}#hud .tiny-label{font-size:8px;letter-spacing:1.5px;opacity:.8}
+#hud .hud-bottom{left:28px;right:28px;bottom:25px;align-items:flex-end}#hud .vital-box{width:94px}#hud .health-row{gap:7px;align-items:baseline}#hud #health-number{font-size:32px;line-height:1.1;font-weight:500}#hud .health-icon{font-size:21px;color:#b3c2a2}#hud .health-track{height:3px;margin-top:7px}
+#hud .weapon-box{min-width:0;max-width:300px;text-align:right;display:flex;gap:14px;align-items:baseline}#hud .weapon-box>b{font-size:18px;line-height:1.2;margin:0;font-weight:400}#hud #ammo-display{font-size:18px;letter-spacing:0;color:#cbd6ba}
+#hud #interact-prompt{top:64%;padding:8px 12px;font-size:11px;max-width:390px;width:max-content;text-align:center;background:#10201cd9;border-color:#b8cc8533;box-shadow:none}#hud #interact-prompt kbd{font-size:9px;padding:2px 4px;margin-right:6px}
+#hud #placement-prompt{top:18%;font-size:11px;padding:9px 13px;max-width:440px;background:#10201cdd;border-color:#b8cc8555}
+#notifications{top:105px;left:28px;transform:none;width:min(360px,calc(100vw - 56px));align-items:flex-start;gap:0;z-index:5}.notification{font-size:10px;letter-spacing:.3px;font-weight:500;padding:9px 12px;border-left-width:2px;box-shadow:none;max-width:100%;background:#12231dde;animation:small-toast 2.4s ease both;text-align:left}
+@keyframes small-toast{0%{opacity:0;transform:translateY(-4px)}9%,80%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-3px)}}
+#crosshair.charging{filter:drop-shadow(0 0 4px #e6f4ac);scale:calc(.8 + var(--charge)*.5)}#crosshair.charging i{background:#e2eda9}
+.progress-details{border-top:1px solid var(--line);margin-top:20px;padding-top:14px;color:var(--muted);font-size:11px}.progress-details summary{cursor:pointer;color:var(--cream)}.progress-details dl{display:grid;grid-template-columns:1fr 1.5fr;gap:11px;margin:16px 0 0}.progress-details dt,.progress-details dd{margin:0;font-size:10px}.progress-details dd{color:#d7dec8}
+@media(max-width:650px){#hud .hud-top{left:18px;right:18px;top:18px}#hud .hud-bottom{left:18px;right:18px;bottom:18px}#hud .weapon-box>b{font-size:14px}#hud .weapon-box{max-width:210px}#notifications{left:18px;top:100px;width:280px}}

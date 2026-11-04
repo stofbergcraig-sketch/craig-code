@@ -1,5 +1,15 @@
 # Expansion validation
 
+## Minimal HUD and varied terrain update
+
+- All17 named code-level scenarios pass (4 core, 7 expansion, 6 terrain). Terrain checks cover sampled mesh heights, bounded slopes, sprint/dash/slide/jump/landing on grades, elevated and sunken goblin navigation, ridge ray obstruction, raised tower placement and preserving upgrades when a saved tower needs a nearby clear spot.
+- `tests/terrain-browser.mjs` passes: no always-visible controls/ability rows/streak/earnings text, working pause progress, actual-map sprint from near0m to the3m camp plateau without losing ground contact, grounded barrels/caches, raised tower placement and reload restoration. Screenshots inspected from the camp approach and the southwestern valley.
+- Original, expansion and special-ability browser suites pass after the terrain/UI changes, including the150,000-kill ending and confirmed reset. Excalibur charging now uses a visual crosshair cue; detailed readiness text is in pause progress.
+- The updated16-tower/200-goblin fixed-step actual-map simulation passes: max9 active projectiles, max432 particles,357 genuine kills over19.2 simulated seconds, all enemy transforms finite, about1.42ms CPU/update. This is a simulation sample, not a rendered FPS or memory endurance claim.
+- Remaining practical limits: local obstacle steering rather than global pathfinding, tower placement on gentle ground only, simplified ragdolls. Windows GPU performance, extended-session testing and a full human playthrough are not verified in this Linux cloud.
+
+The preceding expansion results below describe the prior validation baseline.
+
 Validated in the Linux cloud with Node 24 and Chromium software WebGL. These results do not establish a Windows laptop frame rate or a full-session completion time.
 
 - Four preserved core scenarios passed: saves/purchases/settings/reset, exact victory threshold/storage failure, exactly-once enemy credit/wall obstruction, movement/jumps/dash/slide/collision.

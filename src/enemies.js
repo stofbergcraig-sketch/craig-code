@@ -119,8 +119,9 @@ export class EnemySystem {
 
   _clearAt(x, z, radius = .55) {
     if (Math.abs(x) > 105 || Math.abs(z) > 105) return false;
+    const floor=this.world.heightAt?.(x,z)||0;
     for (const b of this.world.colliders || []) {
-      if (!b.legendary && ((b.y || 0) > 1.6 || b.h < .45)) continue;
+      if (!b.legendary && ((b.y || 0) > floor+1.6 || (b.y||0)+b.h<floor+.2 || b.h < .45)) continue;
       if (Math.abs(x - b.x) < b.w / 2 + radius && Math.abs(z - b.z) < b.d / 2 + radius) return false;
     }
     return true;
@@ -136,7 +137,7 @@ export class EnemySystem {
     if (!e) return null;
     const t = TYPES[type] || TYPES[0];
     e.active = true; e.counted = false; e.type = type; e.hp = t.hp;
-    e.position.set(x, 0, z); e.velocity.set(0, 0, 0);
+    e.position.set(x, this.world.heightAt?.(x,z)||0, z); e.velocity.set(0, 0, 0);
     e.yaw = Math.random() * Math.PI * 2; e.stun = 0; e.flash = 0;
     e.attack = .4 + Math.random() * .7; e.lastChain = -10;
     e.panic=0;e.think=0;e.fleeX=0;e.fleeZ=1;e.stumbleAt=2+Math.random()*5;e.stumble=0;
@@ -189,6 +190,7 @@ export class EnemySystem {
 
   _move(e, dt) {
     const p = e.position, r = .3 * TYPES[e.type].scale;
+    const oldFloor=this.world.heightAt?.(p.x,p.z)||0,grounded=p.y<=oldFloor+.08&&e.velocity.y<=0;
     const oldX = p.x, oldZ = p.z;
     p.x += e.velocity.x * dt;
     p.z += e.velocity.z * dt;
@@ -208,6 +210,7 @@ export class EnemySystem {
       }
     }
     p.x = THREE.MathUtils.clamp(p.x, -105, 105); p.z = THREE.MathUtils.clamp(p.z, -105, 105);
+    const floor=this.world.heightAt?.(p.x,p.z)||0;if(grounded)p.y=floor;else if(p.y<floor){p.y=floor;e.velocity.y=0;}
     return collided;
   }
 
@@ -219,17 +222,18 @@ export class EnemySystem {
     for (const e of this.enemies) {
       if (!e.active) continue;
       const t = TYPES[e.type], p = e.position;
+      const ground=this.world.heightAt?.(p.x,p.z)||0;
       const dx = player.position.x - p.x, dz = player.position.z - p.z;
       const distance = Math.hypot(dx, dz);
       if (distance > 85) { e.active = false; this._alive--; continue; }
       e.flash = Math.max(0, e.flash - dt); e.attack -= dt;
-      if (e.stun > 0 || p.y > .05) {
+      if (e.stun > 0 || p.y > ground+.05) {
         e.stun = Math.max(0, e.stun - dt);
         const speed = Math.hypot(e.velocity.x, e.velocity.z);
         if (speed > 9) this._chain(e, speed);
         e.velocity.x *= Math.exp(-dt * 1.9); e.velocity.z *= Math.exp(-dt * 1.9);
         e.velocity.y -= 25 * dt; p.y += e.velocity.y * dt;
-        if (p.y < 0) { p.y = 0; e.velocity.y = 0; }
+        if (p.y < ground) { p.y = ground; e.velocity.y = 0; }
         if (this._move(e, dt) && speed > 10) this._damage(e, speed * 1.8, zero, 0);
       } else {
         if(distance<18)e.panic=2.3;
@@ -278,8 +282,9 @@ export class EnemySystem {
       const speed = Math.hypot(c.velocity.x, c.velocity.z);
       if (speed > 7) this._chain(c, speed);
       c.velocity.y -= 22 * dt; c.position.addScaledVector(c.velocity, dt);
-      if (c.position.y < .16) {
-        c.position.y = .16; c.velocity.y = Math.abs(c.velocity.y) > 2 ? Math.abs(c.velocity.y) * .28 : 0;
+      const corpseFloor=(this.world.heightAt?.(c.position.x,c.position.z)||0)+.16;
+      if (c.position.y < corpseFloor) {
+        c.position.y = corpseFloor; c.velocity.y = Math.abs(c.velocity.y) > 2 ? Math.abs(c.velocity.y) * .28 : 0;
         c.velocity.x *= Math.exp(-dt * 5); c.velocity.z *= Math.exp(-dt * 5);
       } else { c.velocity.x *= Math.exp(-dt * .5); c.velocity.z *= Math.exp(-dt * .5); }
       c.spin.x += c.spinVelocity.x * dt; c.spin.z += c.spinVelocity.z * dt;
@@ -318,7 +323,7 @@ export class EnemySystem {
   }
 
   _wallDistance(origin, direction, maximum) {
-    let nearest = maximum;
+    let nearest = this.world.groundRayDistance?.(origin,direction,maximum)??maximum;
     for (const b of this.world.colliders || []) {
       let near = 0, far = nearest;
       const bounds = [

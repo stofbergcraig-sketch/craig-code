@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import {createHeightfield} from './terrain.js';
 
 // Everything in Mirebreak is built here from original geometry and pixel textures.
 // Collision coordinates describe solid boxes, with y measured from the ground.
 export function createWorld(scene) {
+  const terrain=createHeightfield(),initialObjects=new Set(scene.children);
   const colliders = [], spawnPoints = [], barrels = [], animated = [];
   const shops = [{ x: -7, z: 5, name: 'THE CROOKED ANVIL' }];
   const secrets = [
@@ -78,22 +80,31 @@ export function createWorld(scene) {
   const moonMap=new THREE.CanvasTexture(moonCanvas);moonMap.colorSpace=THREE.SRGBColorSpace;
   const moon=new THREE.Mesh(new THREE.PlaneGeometry(29,29),new THREE.MeshBasicMaterial({map:moonMap,transparent:true,depthWrite:false,fog:false,color:0x97b5a8}));
   moon.position.set(-48,65,-142);moon.lookAt(0,0,0);scene.add(moon);
+  moon.userData.sky=true;
   const buckets = new Map(), dummy = new THREE.Object3D();
   function put(type, material, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) {
     const key = `${type}:${material}`;
     if (!buckets.has(key)) buckets.set(key, []);
-    dummy.position.set(x, y, z); dummy.scale.set(sx, sy, sz); dummy.rotation.set(rx, ry, rz); dummy.updateMatrix();
+    dummy.position.set(x, y+terrain.heightAt(x,z), z); dummy.scale.set(sx, sy, sz); dummy.rotation.set(rx, ry, rz); dummy.updateMatrix();
     buckets.get(key).push(dummy.matrix.clone());
   }
   function solid(x, z, w, d, h, material = 'stone', y = 0) {
     put('box', material, x, y + h / 2, z, w, h, d);
-    colliders.push({ x, z, w, d, h, y });
+    colliders.push({ x, z, w, d, h, y:y+terrain.heightAt(x,z) });
   }
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(224, 224), mat(0xabb9a1, { map: mudMap }));
-  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+  function surface(w,d,x,z,offset=0){
+    const geometry=new THREE.PlaneGeometry(w,d,Math.ceil(w/1.75),Math.ceil(d/1.75));geometry.rotateX(-Math.PI/2);const p=geometry.attributes.position;
+    for(let i=0;i<p.count;i++)p.setY(i,terrain.heightAt(x+p.getX(i),z+p.getZ(i))+offset);
+    geometry.computeVertexNormals();geometry.computeBoundingSphere();return geometry;
+  }
+  const groundGeometry=surface(224,224,0,0),colors=[];const color=new THREE.Color();
+  for(let i=0;i<groundGeometry.attributes.position.count;i++){const p=groundGeometry.attributes.position,x=p.getX(i),z=p.getZ(i),h=p.getY(i);color.setHex(h<-.8?0x7e998a:terrain.slopeAt(x,z)>.25?0x9d9b88:h>3.5?0xb0b39a:0x9eb19a);colors.push(color.r,color.g,color.b);}
+  groundGeometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  const ground = new THREE.Mesh(groundGeometry, mat(0xabb9a1, { map: mudMap,vertexColors:true }));
+  ground.receiveShadow = true;ground.userData.terrainSurface=true;scene.add(ground);
   function floor(x, z, w, d, color = 0xa7a593) {
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat(color, { map: pathMap }));
-    mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, 0.012 + random() * 0.004, z); mesh.receiveShadow = true; scene.add(mesh);
+    const mesh = new THREE.Mesh(surface(w,d,x,z,.045), mat(color, { map: pathMap }));
+    mesh.position.set(x,0,z);mesh.userData.terrainSurface=true;mesh.receiveShadow = true; scene.add(mesh);
   }
   floor(0, 7, 43, 48); floor(0, -37, 13, 44); floor(-45, 7, 57, 11, 0x969d8b);
   floor(46, 9, 57, 12, 0x9c927a); floor(-58, -12, 38, 45, 0x84968a);
@@ -168,7 +179,7 @@ export function createWorld(scene) {
   function tree(x,z,scale=1,dead=false) {
     const h=range(8,13)*scale;
     put('cylinder','bark',x,h/2,z,0.85*scale,h,0.85*scale,0,0,range(-0.04,0.04));
-    if (scale>0.8) colliders.push({x,z,w:0.9*scale,d:0.9*scale,h});
+    if (scale>0.8) colliders.push({x,z,w:0.9*scale,d:0.9*scale,h,y:terrain.heightAt(x,z)});
     for(let i=0;i<3;i++) {
       const a=i*2.1+random(),len=range(2,4)*scale;
       put('cylinder','bark',x+Math.sin(a)*len*0.35,h*(0.5+i*0.12),z+Math.cos(a)*len*0.35,0.3*scale,len,0.3*scale,Math.cos(a)*0.9,0,Math.sin(a)*0.9);
@@ -280,6 +291,12 @@ export function createWorld(scene) {
     scene.add(group);secret.mesh=group;animated.push({type:'gem',mesh:gem,phase:random()*6});
   }
   // Overgrowth, scattered cobbles, and border cliff silhouettes.
+  // Broken rock shelves frame the new ridges; the broad approach lanes stay clear.
+  for(const [cx,cz]of [[-85,45],[-53,-57],[88,-41],[66,73]])for(let i=0;i<4;i++){
+    const x=cx+i*2.1-3.1,z=cz+Math.sin(i)*1.4,h=1.8+Math.sin(i*1.8)*.6;
+    put('rock','darkStone',x,h*.45,z,3.8,h*1.5,3.5,0,i*.5,.1);colliders.push({x,z,w:2.6,d:2.5,h,y:terrain.heightAt(x,z)});
+    put('rock','moss',x,h+.15,z,2.1,.5,2.1,0,i,.1);
+  }
   for(let i=0;i<640;i++) {
     const x=range(-100,100),z=range(-100,100);
     if((Math.abs(x)<8)||(Math.abs(z-8)<7)||(Math.abs(x)<21&&z>-17&&z<32))continue;
@@ -290,22 +307,24 @@ export function createWorld(scene) {
     const a=-108+i*13.5,x=side<2?a:(side===2?-109:109),z=side<2?(side===0?-109:109):a;
     put('rock','darkStone',x,range(3,7),z,range(14,24),range(13,23),range(13,21),0,random(),0);
   }
-  colliders.push({x:-110,z:0,w:4,d:224,h:40},{x:110,z:0,w:4,d:224,h:40},{x:0,z:-110,w:224,d:4,h:40},{x:0,z:110,w:224,d:4,h:40});
+  colliders.push({x:-110,z:0,w:4,d:224,h:50,y:-5},{x:110,z:0,w:4,d:224,h:50,y:-5},{x:0,z:-110,w:224,d:4,h:50,y:-5},{x:0,z:110,w:224,d:4,h:50,y:-5});
   // All spawn points must have clearance from solid scenery and be on the ground.
   const clusters=[[-3,1],[12,1],[-11,22],[9,25],[-37,7],[-55,7],[-72,29],[-56,-30],[-85,-19],[35,9],[58,1],[61,31],[79,28],[52,-23],[0,-31],[5,-47],[0,-68],[0,-84],[-6,48],[5,73]];
   for(const [cx,cz]of clusters)for(let i=0;i<4;i++) {
     const x=cx+range(-3,3),z=cz+range(-3,3);
-    if(!colliders.some(c=>(c.y||0)<1.5&&Math.abs(x-c.x)<c.w/2+1.5&&Math.abs(z-c.z)<c.d/2+1.5))spawnPoints.push({x,z});
+    if(!colliders.some(c=>(c.y||0)<terrain.heightAt(x,z)+1.5&&Math.abs(x-c.x)<c.w/2+1.5&&Math.abs(z-c.z)<c.d/2+1.5))spawnPoints.push({x,z});
   }
   // Instancing keeps hundreds of props to a few dozen draw calls.
   for(const [key,matrices]of buckets) {
     const [type,material]=key.split(':');
     const mesh=new THREE.InstancedMesh(geometry[type],materials[material],matrices.length);
     matrices.forEach((matrix,i)=>mesh.setMatrixAt(i,matrix));mesh.instanceMatrix.needsUpdate=true;
-    mesh.receiveShadow=true;mesh.castShadow=!['grass','orange','cyan'].includes(material);mesh.computeBoundingSphere();scene.add(mesh);
+    mesh.receiveShadow=true;mesh.castShadow=!['grass','orange','cyan'].includes(material);mesh.computeBoundingSphere();mesh.userData.anchored=true;scene.add(mesh);
   }
+  // Direct groups/lights share the same ground anchor as the instanced scenery.
+  for(const object of scene.children)if(!initialObjects.has(object)&&!object.userData.sky&&!object.userData.anchored&&!object.userData.terrainSurface)object.position.y+=terrain.heightAt(object.position.x,object.position.z);
   return {
-    colliders,spawnPoints,shops,secrets,barrels,
+    colliders,spawnPoints,shops,secrets,barrels,terrain,heightAt:terrain.heightAt,slopeAt:terrain.slopeAt,groundRayDistance:terrain.rayDistance,
     zoneAt(x,z) { if(z < -47)return 'THE HOLLOW KEEP';if(x < -29)return 'GRAVEWOOD';if(x > 30)return 'SPLINTER CAMP';if(z>38)return 'THE OLD CAUSEWAY';return 'DEBTOR’S COURTYARD'; },
     update(dt,time) {
       for(const a of animated) {

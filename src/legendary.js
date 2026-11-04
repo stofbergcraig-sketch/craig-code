@@ -5,9 +5,10 @@ import {EXCALIBUR_KILLS} from './progression.js';
 export class LegendarySite {
   constructor(scene,world,progress,fx,audio){Object.assign(this,{scene,world,progress,fx,audio});this.center=new THREE.Vector3(18,0,60);this.elapsed=-1;
     const stone=new THREE.MeshStandardMaterial({color:0x4b6156,roughness:1,flatShading:true}),soil=new THREE.MeshStandardMaterial({color:0x344c3e,roughness:1,flatShading:true});
-    // A modest terraced hill beside the existing causeway; every rise is stepable.
-    for(let i=0;i<15;i++){const width=29-i*1.65,h=.38,y=i*h;const block=new THREE.Mesh(new THREE.BoxGeometry(width,h,width),i%3===0?stone:soil);block.position.set(18,y+h/2,60);scene.add(block);world.colliders.push({x:18,z:60,w:width,d:width,h,y,legendary:true});}
-    this.top=15*.38;
+    // Keep the sword's original hill and interaction, anchored to the new ground.
+    const base=world.heightAt?.(18,60)||0;this.center.y=base;
+    for(let i=0;i<15;i++){const width=29-i*1.65,h=.38,y=base+i*h;const block=new THREE.Mesh(new THREE.BoxGeometry(width,h,width),i%3===0?stone:soil);block.position.set(18,y+h/2,60);scene.add(block);world.colliders.push({x:18,z:60,w:width,d:width,h,y,legendary:true});}
+    this.top=base+15*.38;
     const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(1.4,0),stone);rock.scale.set(1.4,.8,1);rock.position.set(18,this.top+.7,60);scene.add(rock);world.colliders.push({x:18,z:60,w:2.4,d:2,h:1.7,y:this.top,legendary:true});
     this.sword=buildLegendarySword().group;this.sword.rotation.set(0,0,Math.PI);this.sword.position.set(18,this.top+2.2,60);this.sword.scale.setScalar(2);scene.add(this.sword);
     const glow=new THREE.MeshBasicMaterial({color:0xc6e9a6,transparent:true,opacity:.6,depthWrite:false});this.runes=new THREE.Group();this.runes.position.set(18,this.top+.05,60);scene.add(this.runes);

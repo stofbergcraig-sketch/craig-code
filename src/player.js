@@ -18,7 +18,7 @@ export class Player {
   slide() { if(!this.grounded){this.slam=true;this.velocity.y=-32;this.cue('dash');return;}
     this.slideTime=.75;let v=new THREE.Vector3(this.velocity.x,0,this.velocity.z);if(v.length()<3)v.set(-Math.sin(this.yaw),0,-Math.cos(this.yaw));v.normalize().multiplyScalar(24);this.velocity.x=v.x;this.velocity.z=v.z;this.cue('slide'); }
   direction(keys) { return new THREE.Vector3((keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),0,(keys.has('KeyS')?1:0)-(keys.has('KeyW')?1:0)).normalize().applyAxisAngle(new THREE.Vector3(0,1,0),this.yaw); }
-  respawn() {this.position.set(0,0,12);this.velocity.set(0,0,0);this.health=100;this.jumps=0;this.grounded=true;this.slam=false;this.yaw=0;this.pitch=0;this.damageCooldown=2;}
+  respawn() {this.position.set(0,this.world.heightAt?.(0,12)||0,12);this.velocity.set(0,0,0);this.health=100;this.jumps=0;this.grounded=true;this.slam=false;this.yaw=0;this.pitch=0;this.damageCooldown=2;}
   update(dt,keys) {
     this.dashCooldown=Math.max(0,this.dashCooldown-dt);this.dashTime=Math.max(0,this.dashTime-dt);this.slideTime=Math.max(0,this.slideTime-dt);this.damageCooldown=Math.max(0,this.damageCooldown-dt);
     const dir=this.direction(keys), sprint=keys.has('ShiftLeft')||keys.has('ShiftRight');
@@ -28,7 +28,7 @@ export class Player {
       if(!sliding||dir.lengthSq()>0){ this.velocity.x=THREE.MathUtils.lerp(this.velocity.x,dir.x*speed,blend);this.velocity.z=THREE.MathUtils.lerp(this.velocity.z,dir.z*speed,blend); }
       else {this.velocity.x*=Math.exp(-dt*1.3);this.velocity.z*=Math.exp(-dt*1.3);}
     }
-    const oldY=this.position.y;this.velocity.y-=25*dt;
+    const oldY=this.position.y,wasGrounded=this.grounded;this.velocity.y-=25*dt;
     const radius=.38, height=this.slideTime>0?1.05:1.72;
     // Resolve axes separately, allowing a small automatic step onto low stonework.
     for(const axis of ['x','z']) {
@@ -43,14 +43,14 @@ export class Player {
         }
       }
     }
-    this.position.y+=this.velocity.y*dt;let floor=0;
+    this.position.y+=this.velocity.y*dt;let floor=this.world.heightAt?.(this.position.x,this.position.z)||0;
     for(const b of this.world.colliders){const top=(b.y||0)+b.h;
       if(Math.abs(this.position.x-b.x)<b.w/2+radius&&Math.abs(this.position.z-b.z)<b.d/2+radius){
         if(oldY>=top-.05&&this.position.y<=top&&this.velocity.y<=0)floor=Math.max(floor,top);
         if(oldY+height<=(b.y||0)&&this.position.y+height>(b.y||0)&&this.velocity.y>0){this.position.y=(b.y||0)-height;this.velocity.y=0;}
       }
     }
-    if(this.position.y<=floor){const landed=!this.grounded;this.position.y=floor;this.velocity.y=0;this.grounded=true;this.jumps=0;if(landed&&this.slam)this.cue('slam');this.slam=false;}
+    if(this.position.y<=floor||(wasGrounded&&this.velocity.y<=0&&this.position.y-floor<.65)){const landed=!this.grounded;this.position.y=floor;this.velocity.y=0;this.grounded=true;this.jumps=0;if(landed&&this.slam)this.cue('slam');this.slam=false;}
     else {this.grounded=false;if(this.jumps===0)this.jumps=1;}
     this.position.x=THREE.MathUtils.clamp(this.position.x,-105,105);this.position.z=THREE.MathUtils.clamp(this.position.z,-105,105);
     this.step+=Math.hypot(this.velocity.x,this.velocity.z)*dt;
