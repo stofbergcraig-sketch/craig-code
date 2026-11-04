@@ -11,7 +11,7 @@ const movement=await page.evaluate(()=>({p:window.__MIREBREAK__.player.position.
 await page.evaluate(()=>{const g=window.__MIREBREAK__;g.player.respawn();g.enemies.clear();g.enemies.spawn(0,10.2);});await page.waitForTimeout(100);await page.keyboard.down('Shift');await page.keyboard.down('w');await page.mouse.down();await page.waitForFunction(()=>window.__MIREBREAK__.progress.data.kills>0,null,{timeout:15000});await page.mouse.up();await page.keyboard.up('w');await page.keyboard.up('Shift');assert.ok(await page.evaluate(()=>window.__MIREBREAK__.progress.data.kills>=1),'Sprint pursuit and slashing should defeat a fleeing goblin');
 await page.evaluate(()=>{const g=window.__MIREBREAK__;g.progress.data.coins=10000;g.player.position.set(-7,0,5);g.interact();});await page.click('[data-id=shotgun]');await page.click('[data-id=hammer]');await page.click('[data-id=trap]');await page.click('[data-action=resume]');
 await page.evaluate(()=>{const g=window.__MIREBREAK__;g.player.respawn();g.enemies.clear();g.switchWeapon('shotgun');g.enemies.spawn(0,8);g.attack();g.reload();});await page.waitForTimeout(2000);
-assert.equal(await page.evaluate(()=>window.__MIREBREAK__.ammo.shotgun),8);
+assert.equal(await page.evaluate(()=>window.__MIREBREAK__.ammo.shotgun),24);
 await page.evaluate(()=>window.__MIREBREAK__.deployTrap());assert.equal(await page.evaluate(()=>window.__MIREBREAK__.traps.length),1);
 await page.screenshot({path:'/tmp/mirebreak-game.png'});
 await page.keyboard.press('Escape');await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>window.__MIREBREAK__.state),'pause');

@@ -1,4 +1,4 @@
-import {BUILD_LIMIT} from './config.js';
+import {BUILD_LIMIT,STARTER_SHEKKLES} from './config.js';
 export const SAVE_KEY = 'mirebreak.goblin-debt.v1';
 export const GOAL = 150000;
 export const EXCALIBUR_KILLS = 20000;
@@ -22,7 +22,7 @@ export const SHOP_ITEMS = [
   { id:'eclipse',name:'The Eclipse Sigil',kind:'weapon',cost:15000,icon:'☉',description:'Spinning rune-discs. F: Eclipse Burst sends a seeking volley.',label:'RUNIC FOCUS · 9' },
   { id: 'damage', name: 'Meaner hands', kind: 'upgrade', cost: 100, max: 5, icon: '✦', description: '+25% weapon damage per rank. More impact. Less negotiation.', label: 'DAMAGE' },
   { id: 'force', name: 'Bad influence', kind: 'upgrade', cost: 80, max: 4, icon: '↗', description: '+25% knockback per rank. Goblins become other goblins’ problem.', label: 'KNOCKBACK' },
-  { id: 'capacity', name: 'Deep pockets', kind: 'upgrade', cost: 140, max: 4, icon: '▥', description: '+2 shotgun shells and +8 repeater rounds per rank.', label: 'MAGAZINE SIZE' },
+  { id: 'capacity', name: 'Deep pockets', kind: 'upgrade', cost: 140, max: 4, icon: '▥', description: '+6 shotgun shells and +24 repeater rounds per rank.', label: 'MAGAZINE SIZE' },
   { id: 'trap', name: 'Thorn engine', kind: 'upgrade', cost: 160, max: 4, icon: '✳', description: 'Press T to plant a deadly crowd-clearing trap. Higher ranks improve its power.', label: 'DEPLOYABLE · T' },
   { id: 'cataclysm', name: 'Ruin covenant', kind: 'weapon', cost: 3000, icon: '◈', description: 'Unleash enormous hammer shockwaves and slam blasts. The debt gets smaller. Fast.', label: 'LATE GAME · HAMMER / SLAM' },
 ].map(item=>item.kind==='weapon'?{...item,cost:Math.round(item.cost*.8)}:item);
@@ -41,7 +41,7 @@ const milestones = new Map([
 ]);
 
 const defaults = () => ({
-  version: 2, kills: 0, coins: 0, totalEarned:0, equipped:'sword', towers:[], owned: ['fists', 'sword'],
+  version: 2, kills: 0, coins: STARTER_SHEKKLES, starterGrantClaimed:true, totalEarned:0, equipped:'sword', towers:[], owned: ['fists', 'sword'],
   upgrades: { damage: 0, force: 0, capacity: 0, trap: 0 },
   settings: { sensitivity: 1, volume: .65, quality: 'medium', shake: .35 },
   victorySeen: false, secrets: [],
@@ -54,6 +54,8 @@ function sanitize(raw) {
   const data = defaults();
   data.kills = Math.floor(finite(raw.kills, 0, 0, Number.MAX_SAFE_INTEGER));
   data.coins = Math.floor(finite(raw.coins, 0, 0, Number.MAX_SAFE_INTEGER));
+  // One-time top-up for existing saves; spending remains saved across reloads.
+  if(raw.starterGrantClaimed!==true)data.coins=Math.max(data.coins,STARTER_SHEKKLES);
   // Keep the original storage key and migrate v1 balances without losing purchases.
   data.totalEarned=Math.max(data.kills,Math.floor(finite(raw.totalEarned,data.kills,0,Number.MAX_SAFE_INTEGER)));
   data.owned = [...new Set(['fists', 'sword', ...(Array.isArray(raw.owned) ? raw.owned.filter(x => weapons.has(x)) : [])])];

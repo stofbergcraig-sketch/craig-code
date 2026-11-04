@@ -111,7 +111,7 @@ export class EnemySystem {
     this.quality = quality;
     this.maxAlive = quality === 'low' ? 200 : quality === 'high' ? 650 : 400;
     this.maxCorpses = quality === 'low' ? 24 : quality === 'high' ? 70 : 45;
-    this.spawnRateCap = quality === 'low' ? 60 : quality === 'high' ? 120 : 90;
+    this.spawnRateCap = quality === 'low' ? 80 : quality === 'high' ? 150 : 110;
     if (this.enemies) {
       let count = 0;
       for (const e of this.enemies) if (e.active && ++count > this.maxAlive) { e.active = false; this._alive--; }
@@ -150,8 +150,8 @@ export class EnemySystem {
 
   _spawnWave(player, progress, dt) {
     const kills = progress.kills || 0;
-    const target = Math.min(this.maxAlive, 52 + Math.sqrt(kills) * 4.4);
-    const rate = Math.min(this.spawnRateCap, 10 + Math.sqrt(kills) * 1.9);
+    const target = Math.min(this.maxAlive, 140 + Math.sqrt(kills) * 5.5);
+    const rate = Math.min(this.spawnRateCap, 35 + Math.sqrt(kills) * 2.2);
     this._budget = Math.min(55, this._budget + dt * rate);
     const sectors=new Uint16Array(8);for(const e of this.enemies)if(e.active&&e.position.distanceToSquared(player.position)<2304){const a=Math.atan2(e.position.x-player.position.x,e.position.z-player.position.z);sectors[Math.floor((a+Math.PI)/(Math.PI*2)*8)%8]++;}
     let tries = 0;

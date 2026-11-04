@@ -23,7 +23,7 @@ const sun=new THREE.DirectionalLight(0xffdb9d,2.8);sun.position.set(-40,65,20);s
 const camera=new THREE.PerspectiveCamera(76,innerWidth/innerHeight,.05,350);
 const world=createWorld(scene),fx=new Effects(scene,world),audio=new GameAudio(),progress=new Progression();
 const keys=new Set();let state='title',started=false,time=0,last=performance.now(),weapon='sword',attackTimer=0,reloadTimer=0,quickTimer=0,trapCooldown=0,hitStop=0,shake=0,lastHurt=-10,streak=0,streakTimer=0,saveTimer=0,mouseDown=false,shotCounter=0,pendingVictory=false;
-const ammo={shotgun:8,repeater:32};const traps=[];let ui;
+const ammo={shotgun:24+(progress.data.upgrades.capacity||0)*6,repeater:96+(progress.data.upgrades.capacity||0)*24};const traps=[];let ui;
 weapon=progress.data.equipped;
 const pendingAttacks=[];let specialCooldown=0,charge=0,charging=false,lastLookX=0,lastLookY=0;
 const player=new Player(camera,world,(name)=>{audio.play(name);if(name==='slam'){enemies.blast(player.position,progress.data.owned.includes('cataclysm')?18:9,160*damageMultiplier(),23*forceMultiplier());fx.ring(player.position,12);fx.crack(player.position,7);fx.burst(player.position,0xffd481,3);shake=.25;}});
@@ -38,17 +38,17 @@ const enemies=new EnemySystem(scene,world,{
     if(event?.victory){pendingVictory=true;progress.data.victorySeen=true;progress.save();}
     if(time-lastKillMarker>.04){ui?.hit(true);lastKillMarker=time;}if(shotCounter++%7===0)audio.play('kill',.5);
   },
-  onPlayerHit(amount){if(state!=='playing'||player.damageCooldown>0)return;player.health=Math.max(0,player.health-amount);player.damageCooldown=.25;lastHurt=time;shake=.11;audio.play('hurt',.5);ui.damage();if(player.health<=0)die();},
+  onPlayerHit(){ /* Power-fantasy mode: goblin attacks cannot damage the player. */ },
   onImpact(position,color,intensity){fx.burst(position,color||0xb6d741,Math.min(intensity||1,2));}
 });
 const arcana=new Arcana(scene,enemies,fx,audio),defences=new Defences(scene,world,progress,enemies,arcana,fx,audio);
 function damageMultiplier(){return 1+(progress.data.upgrades.damage||0)*.25;}
 function forceMultiplier(){return 1+(progress.data.upgrades.force||0)*.25;}
-function magazine(id=weapon){return (WEAPONS[id].ammo||0)+(progress.data.upgrades.capacity||0)*(id==='shotgun'?2:8);}
+function magazine(id=weapon){return (WEAPONS[id].ammo||0)+(progress.data.upgrades.capacity||0)*(id==='shotgun'?6:24);}
 function applySettings(){const s=progress.data.settings;audio.setVolume(s.volume);enemies.setQuality(s.quality);renderer.setPixelRatio(Math.min(devicePixelRatio,s.quality==='low'?.75:s.quality==='high'?1.75:1.25));fx.max=s.quality==='low'?300:700;}
 function setState(next){state=next;keys.clear();mouseDown=false;charging=false;charge=0;if(next!=='playing'){pendingAttacks.length=0;if(document.pointerLockElement)document.exitPointerLock();}ui.show(next==='playing'?null:next);}
 async function lockAndPlay(){audio.unlock();if(!started){started=true;seedCrowd();}if(player.health<=0)player.respawn();setState('playing');try{await renderer.domElement.requestPointerLock();}catch {ui.notify('Click the game to capture your mouse.','info');}}
-function seedCrowd(){for(let i=0;i<35;i++){const a=i*2.399,r=16+Math.random()*12;enemies.spawn(Math.sin(a)*r,12-Math.cos(a)*r,i%11===0?1:0);}}
+function seedCrowd(){for(let i=0;i<85;i++){const a=i*2.399,r=16+Math.random()*12;enemies.spawn(Math.sin(a)*r,12-Math.cos(a)*r,i%11===0?1:0);}}
 function die(){progress.data.coins=Math.floor(progress.data.coins*.9);progress.save();audio.play('death');setState('death');}
 ui=new GameUI(progress,{
   onPlay:lockAndPlay,onResume:lockAndPlay,onPause:()=>setState('pause'),
@@ -56,7 +56,7 @@ ui=new GameUI(progress,{
   onEquip(id){switchWeapon(id);lockAndPlay();},
   onTowerUpgrade(id){const ok=progress.upgradeTower(id);ui.notify(ok?'Tower upgraded. Runes reinforced.':'Not enough Shekkles or already maximum level.',ok?'unlock':'info');if(ok)audio.play('buy');},
   onPurchase(id){if(id.startsWith('tower:')){defences.begin(id.slice(6));lockAndPlay();return {placing:true};}const result=progress.purchase(id);ui.notify(result.message,result.ok?'unlock':'info');if(result.ok){audio.play('buy');if(WEAPONS[id])switchWeapon(id);ammo.shotgun=Math.max(ammo.shotgun,magazine('shotgun'));ammo.repeater=Math.max(ammo.repeater,magazine('repeater'));}return result;},
-  onReset(){ui.resetRewards();progress.reset();player.respawn();weapon='sword';view.setWeapon(weapon);started=false;enemies.clear();foundSecrets.clear();clearTraps();defences.restore();arcana.clear();legendary.reset();ammo.shotgun=8;ammo.repeater=32;specialCooldown=0;pendingVictory=false;applySettings();setState('title');},
+  onReset(){ui.resetRewards();progress.reset();player.respawn();weapon='sword';view.setWeapon(weapon);started=false;enemies.clear();foundSecrets.clear();clearTraps();defences.restore();arcana.clear();legendary.reset();ammo.shotgun=24;ammo.repeater=96;specialCooldown=0;pendingVictory=false;applySettings();setState('title');},
   onSettings(settings){Object.assign(progress.data.settings,settings);progress.save();applySettings();},
   onImport(text){const ok=progress.importSave(text);if(ok){ui.resetRewards();switchWeapon(progress.data.equipped);foundSecrets.clear();clearTraps();defences.restore();arcana.clear();legendary.reset();applySettings();ui.notify('Save restored. Your debt remembers.','unlock');}return ok;}
 });
