@@ -56,6 +56,19 @@ export class GameAudio {
     this.last.set(name, t);
     const v = Math.max(.05, Math.min(1.5, intensity)), p = .92 + Math.random() * .16;
     switch (name) {
+      case 'magic':
+        this.tone(520,155,.22,.25*v,'triangle');this.tone(970,390,.16,.1*v);this.noise(.15,.14*v,2300,'bandpass');break;
+      case 'bolt':
+        this.noise(.12,.3*v,2300,'bandpass');this.tone(145,50,.1,.22*v,'triangle');break;
+      case 'hook':
+        this.noise(.35,.3*v,1700,'highpass');[640,820,540].forEach((f,i)=>this.tone(f,170,.08,.1*v,'triangle',i*.07));break;
+      case 'lightning':
+        this.noise(.26,.4*v,4200,'bandpass');this.tone(75,38,.22,.3*v,'sawtooth');break;
+      case 'charge':
+        this.tone(160,760,.7,.26*v,'triangle');this.noise(.65,.12*v,800,'bandpass',0,2400);break;
+      case 'legendary':
+        [220,330,440,660,880].forEach((f,i)=>this.tone(f,f*1.01,.7,.18*v,'triangle',i*.09));this.noise(.7,.3*v,1700);break;
+      case 'wind':this.noise(.9,.035*v,450,'bandpass');break;
       case 'swing':
         this.noise(.16, .45 * v, 1000, 'bandpass', 0, 3200); this.tone(130, 65, .13, .12 * v); break;
       case 'punch':

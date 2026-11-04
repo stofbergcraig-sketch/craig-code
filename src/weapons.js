@@ -8,6 +8,10 @@ export const WEAPONS = {
   hammer: { name: 'BELLBREAKER', damage: 180, range: 8, cooldown: .95, force: 35, cosAngle: -.18 },
   shotgun: { name: 'GRAVELMOUTH', damage: 35, range: 60, cooldown: .65, force: 22, ammo: 8, reload: 1.5 },
   repeater: { name: 'THE ARGUMENT', damage: 90, range: 85, cooldown: .105, force: 14, ammo: 32, reload: 1.7 },
+  gravehook:{name:'THE GRAVEHOOK',damage:105,range:5.8,cooldown:.3,force:16,cosAngle:.05,contact:.1,special:'Soul Hook',specialCooldown:2.5},
+  gravebreaker:{name:'THE GRAVEBREAKER',damage:420,range:10,cooldown:1.05,force:44,cosAngle:-.2,contact:.28,special:'Earthbreaker',specialCooldown:7},
+  eclipse:{name:'THE ECLIPSE SIGIL',damage:125,range:65,cooldown:.23,force:15,special:'Eclipse Burst',specialCooldown:5},
+  excalibur:{name:'EXCALIBUR',damage:260,range:9,cooldown:.34,force:28,cosAngle:-.05,contact:.12,special:'Charged Soulwave',specialCooldown:3},
 };
 
 const mat = (color, roughness = .65, metalness = .15) => new THREE.MeshStandardMaterial({ color, roughness, metalness, flatShading: true });
@@ -121,6 +125,22 @@ function buildHammer() {
   return { group: g, plate };
 }
 
+export function buildLegendarySword(){
+  const model=buildSword();model.group.scale.set(1.18,1.2,1.18);
+  const halo=new THREE.Mesh(new THREE.TorusGeometry(.17,.014,5,24),PALETTE.gold);halo.position.y=.2;model.group.add(halo);
+  for(let i=0;i<6;i++)box(model.group,[.025,.04,.018],[(i%2?.045:-.045),.34+i*.08,.033],PALETTE.magic,[0,0,.7]);
+  return model;
+}
+function buildHook(){
+  const group=new THREE.Group();meleeGrip(group,.36);
+  prism(group,[[0,0],[-.15,.14],[-.33,.17],[-.43,.06],[-.4,-.12],[-.27,-.24],[-.31,-.03],[-.18,.04],[0,-.05]],.065,[0,.45,0],PALETTE.darkIron);
+  for(let i=0;i<4;i++)box(group,[.02,.045,.075],[-.12-i*.065,.52,.005],PALETTE.magic,[0,0,-.4]);
+  for(let i=0;i<8;i++){const link=new THREE.Mesh(new THREE.TorusGeometry(.035,.009,4,8),PALETTE.iron);link.position.set(.04+Math.sin(i*.4)*.05,-.25-i*.045,.02);link.rotation.y=i%2*Math.PI/2;group.add(link);}
+  return {group};
+}
+function buildGravebreaker(){const m=buildHammer();m.group.scale.setScalar(1.18);for(const x of [-.3,.3]){const spike=new THREE.Mesh(new THREE.ConeGeometry(.07,.25,4),PALETTE.black);spike.position.set(x,.78,0);m.group.add(spike);}for(let i=0;i<5;i++)box(m.group,[.018,.18,.012],[-.18+i*.09,.54,.19],PALETTE.magic,[0,0,(i%2?1:-1)*.55]);return m;}
+function buildSigil(){const group=new THREE.Group();hand(group,[0,0,0],[-.5,0,0]);box(group,[.19,.18,.12],[0,.02,-.11],PALETTE.darkIron);const rings=[];for(let i=0;i<3;i++){const ring=new THREE.Group();ring.position.set(-.04,.16,-.23-i*.09);const hoop=new THREE.Mesh(new THREE.TorusGeometry(.15+i*.035,.008,5,32),i===1?PALETTE.gold:PALETTE.magic);ring.add(hoop);for(let j=0;j<8;j++)box(ring,[.015,.045,.012],[Math.cos(j*Math.PI/4)*(.15+i*.035),Math.sin(j*Math.PI/4)*(.15+i*.035),0],PALETTE.gold,[0,0,j*Math.PI/4]);group.add(ring);rings.push(ring);}return {group,rings};}
+
 function buildGun(repeater) {
   const g = new THREE.Group();
   // The construction follows a visible receiver, working action, grip and barrel.
@@ -181,7 +201,7 @@ export class WeaponView {
     const light = new THREE.DirectionalLight(0xffd8a3, 3.2); light.position.set(-2, 4, 4); this.scene.add(light);
     const rim = new THREE.DirectionalLight(0x70e8ce, 1.8); rim.position.set(2, 1, -3); this.scene.add(rim);
     this.root = new THREE.Group(); this.scene.add(this.root);
-    this.models = { fists: buildFists(), sword: buildSword(), axe: buildAxe(), hammer: buildHammer(), shotgun: buildGun(false), repeater: buildGun(true) };
+    this.models = { fists: buildFists(), sword: buildSword(), axe: buildAxe(), hammer: buildHammer(), shotgun: buildGun(false), repeater: buildGun(true),gravehook:buildHook(),gravebreaker:buildGravebreaker(),eclipse:buildSigil(),excalibur:buildLegendarySword() };
     for (const model of Object.values(this.models)) { this.root.add(model.group); model.group.visible = false; }
     this.id = 'fists'; this.age = 10; this.switchAge = 1; this.reloadAge = 0; this.reloadDuration = 0; this.recoil = 0; this.alternate = false;
     this.bobPhase = 0; this.sway = new THREE.Vector2(); this.setWeapon('fists');
@@ -194,11 +214,20 @@ export class WeaponView {
   attack() {
     this.age = 0; this.recoil = this.id === 'shotgun' ? 1 : this.id === 'repeater' ? .44 : 0;
     this.alternate = !this.alternate;
+    this.combo=((this.combo||0)+1)%3;
+  }
+  special(){this.specialAge=0;this.attack();this.recoil=1;}
+  thumbnails(){
+    const renderer=new THREE.WebGLRenderer({alpha:true,antialias:false});renderer.setSize(240,140);renderer.outputColorSpace=THREE.SRGBColorSpace;
+    const saved=this.id,images={};const position=this.root.position.clone(),rotation=this.root.rotation.clone();const camera=new THREE.PerspectiveCamera(46,240/140,.01,10);camera.position.set(0,.1,2.3);camera.lookAt(0,.1,0);
+    for(const id of Object.keys(this.models)){this.setWeapon(id);this.root.position.set(0,-.2,0);this.root.rotation.set(0,-.35,-.3);renderer.render(this.scene,camera);images[id]=renderer.domElement.toDataURL();}
+    this.setWeapon(saved);this.root.position.copy(position);this.root.rotation.copy(rotation);renderer.dispose();return images;
   }
   reload(duration = 1.5) { this.reloadAge = 0; this.reloadDuration = duration; }
   update(dt, state = {}) {
     const { speed = 0, grounded = true, sprinting = false, sliding = false, time = 0, lookX = 0, lookY = 0 } = state;
     this.age += dt; this.switchAge += dt; this.reloadAge += dt;
+    this.specialAge=(this.specialAge??10)+dt;
     this.recoil = THREE.MathUtils.damp(this.recoil, 0, 14, dt);
     this.bobPhase += dt * (grounded ? Math.min(speed, 20) * .75 : 1.5);
     const bob = grounded ? Math.min(speed / 15, 1) : .1;
@@ -209,7 +238,7 @@ export class WeaponView {
     this.root.position.set(baseX + Math.sin(this.bobPhase) * .015 * bob - this.sway.x, -.34 + Math.cos(this.bobPhase * 2) * .012 * bob - this.sway.y, -.58);
     this.root.rotation.set(.015 * Math.cos(time * 1.8), 0, .015 * Math.sin(time * 1.4));
     if (sliding) { this.root.position.y -= .06; this.root.rotation.z -= .12; }
-    if (sprinting && speed > 5) { this.root.position.y -= .035; this.root.rotation.z += .10; }
+    if (sprinting && speed > 5) { this.root.position.y -= .055+Math.abs(Math.sin(this.bobPhase))*.025; this.root.rotation.z += .14;this.root.rotation.x+=Math.cos(this.bobPhase)*.025; }
     this.root.position.y -= Math.max(0, 1 - this.switchAge / .2) ** 2 * .42;
     const current = this.models[this.id];
     if (gun) {
@@ -237,8 +266,10 @@ export class WeaponView {
         current.shell.rotation.x = cycle * .8;
         if (current.magazine) current.magazine.position.y -= Math.sin(progress * Math.PI) * .19;
       }
+    } else if(this.id==='eclipse'){
+      current.rings.forEach((ring,i)=>{ring.rotation.z=time*(i%2?-1:1)*(1+i*.4);ring.rotation.y=Math.sin(time+i)*.16;ring.scale.setScalar(1+Math.max(0,1-this.specialAge/.6)*.45);});this.root.position.z+=Math.sin(Math.min(1,this.age/.23)*Math.PI)*.1;
     } else {
-      const duration = { fists: .27, sword: .30, axe: .47, hammer: .61 }[this.id];
+      const duration = { fists: .27, sword: .30, axe: .53, hammer: .68,gravehook:.27,gravebreaker:.8,excalibur:.3 }[this.id];
       const progress = Math.min(1, this.age / duration);
       const swing = Math.sin(progress * Math.PI) ** .75;
       if (this.id === 'fists') {
@@ -250,13 +281,17 @@ export class WeaponView {
         fist.position.z -= swing * .35; fist.position.y += swing * .13;
         this.root.position.x += swing * (this.alternate ? -.1 : .1);
       } else {
-        const heavy = this.id === 'hammer';
-        this.root.rotation.z += swing * (heavy ? .50 : 1.15);
-        this.root.rotation.x -= swing * (heavy ? 1.0 : .5);
-        this.root.rotation.y -= swing * .4;
-        this.root.position.x -= swing * (heavy ? .15 : .37);
-        this.root.position.y += swing * (heavy ? -.13 : .09);
-        this.root.position.z -= swing * .06;
+        const heavy = ['hammer','gravebreaker','axe'].includes(this.id),sign=this.combo===1?-1:1;
+        // Wind-up, fast contact at ~40%, and follow-through are separate phases.
+        const wind=progress<.25?Math.sin(progress/.25*Math.PI):0;
+        const slash=progress<.25?0:Math.sin((progress-.25)/.75*Math.PI);
+        const thrust=!heavy&&this.combo===2;
+        this.root.rotation.z+=wind*-.22*sign+slash*(heavy?.9:1.5)*sign;
+        this.root.rotation.x+=wind*.2-slash*(heavy&&this.combo===2?1.45:.55);
+        this.root.rotation.y+=slash*(thrust?-.1:-.6)*sign;
+        this.root.position.x-=slash*(thrust?.1:heavy?.32:.48)*sign;
+        this.root.position.y+=slash*(heavy?-.12:.06);
+        this.root.position.z-=slash*(thrust?.42:.14);
       }
     }
   }

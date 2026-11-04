@@ -1,11 +1,22 @@
 export const SAVE_KEY = 'mirebreak.goblin-debt.v1';
 export const GOAL = 150000;
+export const EXCALIBUR_KILLS = 20000;
+export const TOWER_TYPES = {
+  bolt:{name:'Wooden Bolt Turret',cost:5000,range:24,damage:90,cooldown:.9,color:0xc0a06b,description:'Tracking crossbow. A dependable single-target hunter.'},
+  wizard:{name:'Arcane Wizard Tower',cost:12500,range:30,damage:130,cooldown:1.1,color:0x87dfca,description:'Homing arcane orbs detonate in a small radius.'},
+  ballista:{name:'Cursed Ballista',cost:25000,range:38,damage:240,cooldown:1.7,color:0xb8dd74,description:'Heavy bolts pierce up to six fleeing goblins.'},
+  storm:{name:'Stormcaller Tower',cost:50000,range:34,damage:150,cooldown:1.3,color:0xbea3ef,description:'Lightning arcs between up to eight goblins.'},
+  spire:{name:'Obsidian Death Spire',cost:100000,range:44,damage:450,cooldown:2,color:0xf1bf79,description:'An ancient sigil detonates across a wide area.'}
+};
 
 export const SHOP_ITEMS = [
   { id: 'axe', name: 'Grudge cleaver', kind: 'weapon', cost: 80, icon: '╱', description: 'A heavy axe. Longer reach, wider cuts, a very bad attitude.', label: 'MELEE · 3' },
   { id: 'shotgun', name: 'Gravelmouth', kind: 'weapon', cost: 120, icon: '═', description: 'A punchy scattergun. Send a whole greeting party backwards.', label: 'SHOTGUN · 5' },
   { id: 'hammer', name: 'Bellbreaker', kind: 'weapon', cost: 220, icon: '┳', description: 'A colossal hammer. Crush crowds and launch the survivors.', label: 'HEAVY MELEE · 4' },
   { id: 'repeater', name: 'The Argument', kind: 'weapon', cost: 600, icon: '»', description: 'A rapid repeater. Settle disagreements at a distance.', label: 'AUTOMATIC · 6' },
+  { id:'gravehook',name:'The Gravehook',kind:'weapon',cost:3000,icon:'☽',description:'Fast cursed sickle. F: Soul Hook pulls a fleeing goblin to you.',label:'CHAIN-SICKLE · 7' },
+  { id:'gravebreaker',name:'The Gravebreaker',kind:'weapon',cost:7500,icon:'┳',description:'Colossal cursed hammer. F: Earthbreaker clears a wide circle.',label:'WARHAMMER · 8' },
+  { id:'eclipse',name:'The Eclipse Sigil',kind:'weapon',cost:15000,icon:'☉',description:'Spinning rune-discs. F: Eclipse Burst sends a seeking volley.',label:'RUNIC FOCUS · 9' },
   { id: 'damage', name: 'Meaner hands', kind: 'upgrade', cost: 100, max: 5, icon: '✦', description: '+25% weapon damage per rank. More impact. Less negotiation.', label: 'DAMAGE' },
   { id: 'force', name: 'Bad influence', kind: 'upgrade', cost: 80, max: 4, icon: '↗', description: '+25% knockback per rank. Goblins become other goblins’ problem.', label: 'KNOCKBACK' },
   { id: 'capacity', name: 'Deep pockets', kind: 'upgrade', cost: 140, max: 4, icon: '▥', description: '+2 shotgun shells and +8 repeater rounds per rank.', label: 'MAGAZINE SIZE' },
@@ -18,6 +29,7 @@ const milestones = new Map([
   [500, '500 DOWN · A professional nuisance.'],
   [2000, '2,000 DOWN · The horde grows. Keep swinging.'],
   [10000, '10,000 DOWN · You are the local weather.'],
+  [20000, '20,000 SOULS · Excalibur awaits on Oath Hill.'],
   [25000, '25,000 DOWN · One sixth of a very bad idea.'],
   [50000, '50,000 DOWN · The bells are getting nervous.'],
   [75000, '75,000 DOWN · Half the debt. All the noise.'],
@@ -26,20 +38,25 @@ const milestones = new Map([
 ]);
 
 const defaults = () => ({
-  version: 1, kills: 0, coins: 0, owned: ['fists', 'sword'],
+  version: 2, kills: 0, coins: 0, totalEarned:0, equipped:'sword', towers:[], owned: ['fists', 'sword'],
   upgrades: { damage: 0, force: 0, capacity: 0, trap: 0 },
   settings: { sensitivity: 1, volume: .65, quality: 'medium', shake: .35 },
   victorySeen: false, secrets: [],
 });
 const finite = (v, fallback, min, max) => typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
-const weapons = new Set(['fists', 'sword', 'axe', 'hammer', 'shotgun', 'repeater', 'cataclysm']);
+const weapons = new Set(['fists', 'sword', 'axe', 'hammer', 'shotgun', 'repeater', 'cataclysm','gravehook','gravebreaker','eclipse','excalibur']);
 
 function sanitize(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.version !== 1) throw new Error('Unsupported save');
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || ![1,2].includes(raw.version)) throw new Error('Unsupported save');
   const data = defaults();
   data.kills = Math.floor(finite(raw.kills, 0, 0, Number.MAX_SAFE_INTEGER));
   data.coins = Math.floor(finite(raw.coins, 0, 0, Number.MAX_SAFE_INTEGER));
+  // Keep the original storage key and migrate v1 balances without losing purchases.
+  data.totalEarned=Math.max(data.kills,Math.floor(finite(raw.totalEarned,data.kills,0,Number.MAX_SAFE_INTEGER)));
   data.owned = [...new Set(['fists', 'sword', ...(Array.isArray(raw.owned) ? raw.owned.filter(x => weapons.has(x)) : [])])];
+  if(data.kills<EXCALIBUR_KILLS)data.owned=data.owned.filter(id=>id!=='excalibur');
+  data.equipped=data.owned.includes(raw.equipped)&&raw.equipped!=='cataclysm'?raw.equipped:'sword';
+  data.towers=(Array.isArray(raw.towers)?raw.towers:[]).slice(0,16).filter(t=>t&&TOWER_TYPES[t.type]&&Number.isFinite(t.x)&&Number.isFinite(t.z)&&Math.abs(t.x)<100&&Math.abs(t.z)<100).map((t,i)=>({id:i+1,type:t.type,x:t.x,z:t.z,level:Math.floor(finite(t.level,1,1,3))}));
   for (const id of Object.keys(data.upgrades)) {
     const max = SHOP_ITEMS.find(x => x.id === id).max;
     data.upgrades[id] = Math.floor(finite(raw.upgrades?.[id], 0, 0, max));
@@ -76,6 +93,7 @@ export class Progression {
   creditKill() {
     this.data.kills++;
     this.data.coins++;
+    this.data.totalEarned++;
     const victory = this.data.kills >= GOAL && !this.data.victorySeen;
     if (victory) this.data.victorySeen = true;
     this.scheduleSave();
@@ -101,13 +119,24 @@ export class Progression {
     if (!item) return { ok: false, message: 'Unknown item.' };
     if (this.getLevel(id) >= (item.max || 1)) return { ok: false, message: 'Already fully upgraded.' };
     const cost = this.getCost(id);
-    if (this.data.coins < cost) return { ok: false, message: 'Not enough brass. Keep swinging.' };
+    if (this.data.coins < cost) return { ok: false, message: 'Not enough Shekkles. Keep swinging.' };
     this.data.coins -= cost;
     if (item.kind === 'upgrade') this.data.upgrades[id]++;
     else this.data.owned.push(id);
     this.save();
     return { ok: true, message: `${item.name.toUpperCase()} ${item.kind === 'upgrade' ? 'UPGRADED' : 'UNLOCKED'}`, item };
   }
+  unlockExcalibur(){
+    if(this.data.kills<EXCALIBUR_KILLS||this.data.owned.includes('excalibur'))return false;
+    this.data.owned.push('excalibur');this.data.equipped='excalibur';this.save();return true;
+  }
+  placeTower(type,x,z){
+    const def=TOWER_TYPES[type];
+    if(!def||this.data.coins<def.cost||this.data.towers.length>=16||!Number.isFinite(x)||!Number.isFinite(z)||Math.abs(x)>=100||Math.abs(z)>=100)return null;
+    this.data.coins-=def.cost;const tower={id:Math.max(0,...this.data.towers.map(t=>t.id))+1,type,x,z,level:1};this.data.towers.push(tower);this.save();return tower;
+  }
+  towerUpgradeCost(tower){return tower&&tower.level<3?Math.round(TOWER_TYPES[tower.type].cost*.55*tower.level):Infinity;}
+  upgradeTower(id){const t=this.data.towers.find(t=>t.id===id),cost=this.towerUpgradeCost(t);if(!t||this.data.coins<cost||t.level>=3)return false;this.data.coins-=cost;t.level++;this.save();return true;}
   save() {
     if (this.saveTimer !== null) { clearTimeout(this.saveTimer); this.saveTimer = null; }
     try {
@@ -118,7 +147,7 @@ export class Progression {
     } catch { this.storageStatus = 'unavailable'; return false; }
   }
   reset() { this.data = defaults(); this.save(); }
-  exportSave() { return JSON.stringify({ ...this.data, version: 1 }, null, 2); }
+  exportSave() { return JSON.stringify({ ...this.data, version: 2 }, null, 2); }
   importSave(text) {
     try {
       if (typeof text !== 'string' || text.length > 100000) return false;

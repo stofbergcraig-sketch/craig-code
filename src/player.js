@@ -37,7 +37,7 @@ export class Player {
         const bottom=b.y||0,top=bottom+b.h;
         if(this.position.y>=top-.02||this.position.y+height<=bottom+.02)continue;
         if(Math.abs(this.position.x-b.x)<b.w/2+radius&&Math.abs(this.position.z-b.z)<b.d/2+radius){
-          if(top-this.position.y<=.5&&this.grounded){this.position.y=top;continue;}
+          if(top-this.position.y<=.5&&(this.grounded||this.velocity.y<=0)){this.position.y=top;continue;}
           const half=(axis==='x'?b.w:b.d)/2;
           this.position[axis]=b[axis]+(this.position[axis]>b[axis]?1:-1)*(half+radius+.001);this.velocity[axis]=0;
         }
@@ -45,7 +45,7 @@ export class Player {
     }
     this.position.y+=this.velocity.y*dt;let floor=0;
     for(const b of this.world.colliders){const top=(b.y||0)+b.h;
-      if(Math.abs(this.position.x-b.x)<b.w/2+radius*.6&&Math.abs(this.position.z-b.z)<b.d/2+radius*.6){
+      if(Math.abs(this.position.x-b.x)<b.w/2+radius&&Math.abs(this.position.z-b.z)<b.d/2+radius){
         if(oldY>=top-.05&&this.position.y<=top&&this.velocity.y<=0)floor=Math.max(floor,top);
         if(oldY+height<=(b.y||0)&&this.position.y+height>(b.y||0)&&this.velocity.y>0){this.position.y=(b.y||0)-height;this.velocity.y=0;}
       }

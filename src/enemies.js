@@ -120,7 +120,7 @@ export class EnemySystem {
   _clearAt(x, z, radius = .55) {
     if (Math.abs(x) > 105 || Math.abs(z) > 105) return false;
     for (const b of this.world.colliders || []) {
-      if ((b.y || 0) > 1.6 || b.h < .45) continue;
+      if (!b.legendary && ((b.y || 0) > 1.6 || b.h < .45)) continue;
       if (Math.abs(x - b.x) < b.w / 2 + radius && Math.abs(z - b.z) < b.d / 2 + radius) return false;
     }
     return true;
@@ -139,6 +139,7 @@ export class EnemySystem {
     e.position.set(x, 0, z); e.velocity.set(0, 0, 0);
     e.yaw = Math.random() * Math.PI * 2; e.stun = 0; e.flash = 0;
     e.attack = .4 + Math.random() * .7; e.lastChain = -10;
+    e.panic=0;e.think=0;e.fleeX=0;e.fleeZ=1;e.stumbleAt=2+Math.random()*5;e.stumble=0;
     this._alive++;
     return e;
   }
@@ -231,18 +232,28 @@ export class EnemySystem {
         if (p.y < 0) { p.y = 0; e.velocity.y = 0; }
         if (this._move(e, dt) && speed > 10) this._damage(e, speed * 1.8, zero, 0);
       } else {
-        let vx = dx / (distance || 1), vz = dz / (distance || 1);
-        // Steer around the nearest blocking corner before sliding against it.
-        const look = 1.2;
-        for (const b of this.world.colliders || []) {
-          if ((b.y || 0) > 1.3 || b.h < .45) continue;
-          if (Math.abs(p.x + vx * look - b.x) < b.w / 2 + .5 && Math.abs(p.z + vz * look - b.z) < b.d / 2 + .5) {
-            const side = Math.sin(e.id * 4.7) > 0 ? 1 : -1;
-            const oldVX = vx; vx = -vz * side; vz = oldVX * side; break;
+        if(distance<18)e.panic=2.3;
+        else e.panic=Math.max(0,e.panic-dt);
+        e.think-=dt;e.stumbleAt-=dt;e.stumble=Math.max(0,e.stumble-dt);
+        if(e.panic>0&&e.stumbleAt<=0){e.stumble=.23;e.stumbleAt=4.5+Math.random()*4;}
+        if(e.think<=0){
+          e.think=.18+Math.random()*.06;
+          if(e.panic>0)this._near(p,other=>{if(other!==e&&other.panic<.5)other.panic=1.4;});
+          const away=e.panic>0?Math.atan2(-dx,-dz):e.yaw+Math.sin(time*.3+e.phase)*.15;
+          let best=-Infinity;
+          // Score stable headings against future clearance. Prefer broad arcs to jitter.
+          for(const turn of [0,.45,-.45,.9,-.9,1.5,-1.5,2.2,-2.2,Math.PI]){
+            const angle=away+turn,tx=Math.sin(angle),tz=Math.cos(angle);
+            let clearance=4.5;
+            for(const step of [.9,2.2,4.5]){if(!this._clearAt(p.x+tx*step,p.z+tz*step,.65)){clearance=step-.9;break;}}
+            const edge=Math.max(0,Math.abs(p.x+tx*5)-97)+Math.max(0,Math.abs(p.z+tz*5)-97);
+            const score=clearance*3+Math.cos(turn)*1.8+(tx*e.fleeX+tz*e.fleeZ)*.65-edge*6;
+            if(score>best){best=score;e.fleeX=tx;e.fleeZ=tz;}
           }
         }
-        const speed = distance < 1.1 ? .2 : t.speed;
-        e.velocity.x = vx * speed; e.velocity.z = vz * speed;
+        let vx=e.fleeX,vz=e.fleeZ;
+        const speed=e.stumble>0?1.8:e.panic>0?(distance<2.5?7.5:e.type===1?13.1:e.type===2?11.9:12.5):1.5;
+        e.velocity.x = THREE.MathUtils.damp(e.velocity.x,vx*speed,8,dt); e.velocity.z = THREE.MathUtils.damp(e.velocity.z,vz*speed,8,dt);
         // Tiny local repulsion keeps the crowd readable without an O(n²) solve.
         if ((e.id & 1) === (Math.floor(time * 60) & 1)) this._near(p, other => {
           if (other === e) return;
@@ -255,7 +266,7 @@ export class EnemySystem {
           }
         });
         this._move(e, dt);
-        e.yaw = Math.atan2(dx, dz);
+        const targetYaw=Math.atan2(e.velocity.x,e.velocity.z);e.yaw+=Math.atan2(Math.sin(targetYaw-e.yaw),Math.cos(targetYaw-e.yaw))*Math.min(1,dt*12);
         if (distance < 1.55 && Math.abs(player.position.y - p.y) < 1.7 && e.attack <= 0 && this._hitCooldown <= 0) {
           this.onPlayerHit(t.damage); this._hitCooldown = .16; e.attack = .9 + Math.random() * .5;
         }
@@ -403,11 +414,11 @@ export class EnemySystem {
 
   _renderOne(e, index, time, dead) {
     const type = TYPES[e.type], scale = type.scale;
-    const walk = dead ? 0 : Math.sin(time * (e.type === 1 ? 18 : 11) + e.phase);
+    const walk = dead ? 0 : Math.sin(time * (e.panic>0?23:e.type === 1 ? 18 : 11) + e.phase);
     const bob = dead ? 0 : Math.abs(walk) * .055;
     const object = this._object, part = this._part;
     object.position.copy(e.position); object.position.y += bob;
-    object.rotation.set(dead ? e.spin.x : 0, e.yaw, dead ? e.spin.z : walk * .035);
+    object.rotation.set(dead ? e.spin.x : e.panic>0?.18:0, e.yaw, dead ? e.spin.z : walk * (e.panic>0?.065:.035));
     const fade = dead ? Math.min(1, e.life * 2) : 1;
     object.scale.setScalar(scale * fade); object.updateMatrix();
     this._root.copy(object.matrix);

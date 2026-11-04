@@ -1,8 +1,9 @@
 import './style.css';
-import { SHOP_ITEMS, GOAL } from './progression.js';
+import { SHOP_ITEMS, GOAL, TOWER_TYPES } from './progression.js';
+import {WEAPONS} from './weapons.js';
 
 const format = value => Math.floor(Number(value) || 0).toLocaleString('en-US');
-const weaponNames = { fists: 'Bare knuckles', sword: 'Rustbite', axe: 'Grudge cleaver', hammer: 'Bellbreaker', shotgun: 'Gravelmouth', repeater: 'The Argument' };
+const weaponNames = Object.fromEntries(Object.entries(WEAPONS).map(([id,w])=>[id,w.name]));
 
 export class GameUI {
   constructor(progression, callbacks = {}) {
@@ -15,12 +16,12 @@ export class GameUI {
     this.root.innerHTML = `
       <div id="vignette"></div><div id="hurt-flash"></div>
       <div id="hud" hidden>
-        <header class="hud-top"><div class="zone-badge"><span class="tiny-label">THE SUNKEN MARCH</span><span id="zone-name">Mourning Courtyard</span></div><div class="debt-box"><span class="tiny-label">THE GOBLIN DEBT</span><div><b id="kill-number">0</b><span class="goal-number"> / 150,000</span></div><div class="progress-track"><i id="debt-progress"></i></div></div><div class="brass-box"><span class="tiny-label">BRASS</span><b><span class="brass-symbol">◈</span> <span id="coin-number">0</span></b></div></header>
+        <header class="hud-top"><div class="zone-badge"><span class="tiny-label">THE SUNKEN MARCH</span><span id="zone-name">Mourning Courtyard</span><small id="excalibur-progress"></small></div><div class="debt-box"><span class="tiny-label">THE GOBLIN DEBT</span><div><b id="kill-number">0</b><span class="goal-number"> / 150,000</span></div><div class="progress-track"><i id="debt-progress"></i></div></div><div class="brass-box"><span class="tiny-label">SHEKKLES</span><b><span class="brass-symbol">◈</span> <span id="coin-number">0</span></b><small id="earned-number"></small><small id="reward-tick"></small></div></header>
         <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div><div id="hitmarker">×</div>
         <div id="streak-box"><b id="streak-number"></b><span>KEEP IT GOING</span></div>
-        <div id="interact-prompt" hidden></div>
+        <div id="interact-prompt" hidden></div><div id="special-status"></div><div id="placement-prompt" hidden></div>
         <footer class="hud-bottom"><div class="vital-box"><span class="tiny-label">STILL KICKING</span><div class="health-row"><span class="health-icon">+</span><b id="health-number">100</b></div><div class="health-track"><i id="health-bar"></i></div></div><div class="ability-row"><div id="dash-status"><kbd>Q</kbd><span>DASH</span><i></i></div><div id="trap-status"><kbd>T</kbd><span>THORN ENGINE</span><i></i></div></div><div class="weapon-box"><span class="tiny-label" id="weapon-class">IN YOUR HANDS</span><b id="weapon-name">Rustbite</b><div id="ammo-display">UNLIMITED BAD INTENTIONS</div></div></footer>
-        <div class="quick-controls"><span><kbd>SHIFT</kbd> sprint</span><span><kbd>SPACE</kbd> double jump</span><span><kbd>CTRL</kbd> slide / slam</span><span><kbd>1–6</kbd> weapons</span><span><kbd>ESC</kbd> pause</span></div>
+        <div class="quick-controls"><span><kbd>SHIFT</kbd> sprint</span><span><kbd>SPACE</kbd> double jump</span><span><kbd>CTRL</kbd> slide / slam</span><span><kbd>TAB</kbd> arsenal</span><span><kbd>F</kbd> special</span><span><kbd>ESC</kbd> pause</span></div>
       </div>
       <div id="notifications" aria-live="polite"></div>
       <main id="menu-layer"></main>
@@ -63,9 +64,13 @@ export class GameUI {
     if (action === 'play') this.callbacks.onPlay?.();
     if (action === 'resume') this.callbacks.onResume?.();
     if (action === 'pause') this.callbacks.onPause?.();
+    if (action === 'arsenal') this.callbacks.onArsenal?.();
+    if (action === 'towers') this.callbacks.onTowers?.();
+    if (action === 'equip') this.callbacks.onEquip?.(id);
+    if (action === 'tower-upgrade') {this.callbacks.onTowerUpgrade?.(Number(id));this.show('towers');}
     if (action === 'shop') this.show('shop');
     if (action === 'purchase') {
-      if (this.callbacks.onPurchase) this.callbacks.onPurchase(id);
+      if (this.callbacks.onPurchase) {const result=this.callbacks.onPurchase(id);if(result?.placing)return;}
       else { const result = this.progression.purchase(id); this.notify(result.message, result.ok ? 'good' : 'error'); }
       this.show('shop');
     }
@@ -79,7 +84,7 @@ export class GameUI {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       this.notify('SAVE BACKUP EXPORTED', 'good');
     }
-    if (action === 'reset' && confirm('Erase all goblin kills, brass and unlocks? This cannot be undone. Export a backup first if you want to keep them.')) {
+    if (action === 'reset' && confirm('Erase all goblin kills, Shekkles and unlocks? This cannot be undone. Export a backup first if you want to keep them.')) {
       if (this.callbacks.onReset) this.callbacks.onReset(); else this.progression.reset();
       this.notify('A fresh debt. A fresh start.');
       this.show('title');
@@ -95,7 +100,7 @@ export class GameUI {
       <div class="save-buttons"><button data-action="export">Export save</button><button data-action="import">Import save</button><button class="danger-link" data-action="reset">Reset progress</button></div></section>`;
   }
   controlsMarkup() {
-    return `<div class="controls-grid"><span><kbd>W A S D</kbd> Move</span><span><kbd>MOUSE</kbd> Look</span><span><kbd>LMB</kbd> Attack</span><span><kbd>RMB</kbd> Quick punch</span><span><kbd>SHIFT</kbd> Sprint</span><span><kbd>SPACE</kbd> Double jump</span><span><kbd>Q</kbd> Dash</span><span><kbd>CTRL</kbd> Slide / air slam</span><span><kbd>R</kbd> Reload</span><span><kbd>1–6</kbd> Switch weapon</span><span><kbd>T</kbd> Plant trap</span><span><kbd>E</kbd> Forge / interact</span></div>`;
+    return `<div class="controls-grid"><span><kbd>W A S D</kbd> Move</span><span><kbd>MOUSE</kbd> Look</span><span><kbd>LMB</kbd> Attack</span><span><kbd>RMB</kbd> Quick punch</span><span><kbd>SHIFT</kbd> Sprint</span><span><kbd>SPACE</kbd> Double jump</span><span><kbd>Q</kbd> Dash</span><span><kbd>CTRL</kbd> Slide / air slam</span><span><kbd>R</kbd> Reload</span><span><kbd>1–0</kbd> Switch weapon</span><span><kbd>F</kbd> Special (hold for Excalibur)</span><span><kbd>TAB</kbd> Weapon arsenal</span><span><kbd>B</kbd> Inspect towers</span><span><kbd>T</kbd> Plant trap</span><span><kbd>E</kbd> Forge / interact</span></div>`;
   }
   saveNote() {
     return this.progression.storageStatus === 'unavailable' ? '<span class="save-warning">Browser saving is unavailable. Export a backup before leaving.</span>' : this.progression.storageStatus === 'recovered' ? '<span class="save-warning">An unreadable save was recovered with fresh progress.</span>' : 'Auto-saved in this browser, on this device. Export a backup to take it with you.';
@@ -107,34 +112,46 @@ export class GameUI {
     this.menu.hidden = screen === null;
     if (screen === null) { this.menu.innerHTML = ''; return; }
     const d = this.progression.data;
+    if(screen==='arsenal'){
+      this.menu.innerHTML=`<section class="panel shop-panel"><header class="shop-header"><div><span class="tiny-label">PERMANENTLY YOURS</span><h2>The arsenal.</h2></div><button class="secondary" data-action="resume">Back to the mire ↗</button></header><div class="shop-grid">${Object.entries(WEAPONS).map(([id,w])=>`<article class="shop-card ${d.owned.includes(id)?'owned':''}">${this.previewMarkup(id)}<h3>${w.name}</h3><p>${w.damage} damage · ${(1/w.cooldown).toFixed(1)} attacks/s · ${w.range}m range<br>${w.special?`F · ${w.special}`:'Reliable bad intentions.'}</p><button data-action="equip" data-id="${id}" ${d.owned.includes(id)?'':'disabled'}>${d.equipped===id?'✓ EQUIPPED':d.owned.includes(id)?'EQUIP':id==='excalibur'?'20,000 SOULS · OATH HILL':'NOT OWNED · AMBER FORGE'}</button></article>`).join('')}</div></section>`;return;
+    }
+    if(screen==='towers'){
+      this.menu.innerHTML=`<section class="panel shop-panel"><header class="shop-header"><div><span class="tiny-label">PERSISTENT DEFENCES · ${d.towers.length} / 16</span><h2>Your watchtowers.</h2><p>Shekkles ${format(d.coins)}</p></div><button class="secondary" data-action="resume">Return ↗</button></header><div class="shop-grid">${d.towers.length?d.towers.map(t=>`<article class="shop-card"><h3>${TOWER_TYPES[t.type].name}</h3><p>Level ${t.level} / 3 · map ${t.x.toFixed(0)}, ${t.z.toFixed(0)}<br>${TOWER_TYPES[t.type].description}</p><button data-action="tower-upgrade" data-id="${t.id}" ${t.level===3||d.coins<this.progression.towerUpgradeCost(t)?'disabled':''}>${t.level===3?'MAX LEVEL':`UPGRADE · ${format(this.progression.towerUpgradeCost(t))} Shekkles`}</button></article>`).join(''):'<p>No towers yet. Purchase and place one at the amber forge.</p>'}</div></section>`;return;
+    }
     if (screen === 'title') {
-      this.menu.innerHTML = `<div class="title-layout"><section class="title-main"><div class="edition-mark"><span class="seal">✳</span> A VERY SMALL APOCALYPSE</div><h1>MIRE<span>BREAK</span></h1><div class="subtitle"><i></i> GOBLIN DEBT <i></i></div><p class="tagline">Tiny goblins.<br>Enormous outstanding balance.</p><div class="title-actions"><button class="primary" data-action="play">${d.kills ? 'CONTINUE THE DEBT' : 'ENTER THE MIRE'} <span>↗</span></button><button class="secondary" data-action="settings">${this.settingsOpen ? 'Close settings' : 'Settings & saves'}</button></div>${this.settingsOpen ? this.settingsMarkup() : `<div class="title-progress"><b>${format(d.kills)}</b><span> / 150,000 GOBLINS</span><div class="progress-track"><i style="width:${Math.min(100, d.kills / GOAL * 100)}%"></i></div></div>`}<div class="save-note">${this.saveNote()}</div></section><aside class="field-guide"><span class="tiny-label">YOUR ONLY ASSIGNMENT</span><h2>Clear the mire.<br>Enjoy the mess.</h2><p>Run fast. Hit hard. Turn brass into better problems at the amber forge.</p><div class="guide-divider"></div><span class="tiny-label">NO LESSONS. JUST BUTTONS.</span>${this.controlsMarkup()}<p class="mouse-note">Click Play to capture your mouse.<br><kbd>ESC</kbd> releases it and pauses the game.</p></aside></div><div class="menu-bottom"><span>ORIGINAL FANTASY MAYHEM</span><span>ONE MIRE. 150,000 BAD NEIGHBOURS.</span></div>`;
+      this.menu.innerHTML = `<div class="title-layout"><section class="title-main"><div class="edition-mark"><span class="seal">✳</span> A VERY SMALL APOCALYPSE</div><h1>MIRE<span>BREAK</span></h1><div class="subtitle"><i></i> GOBLIN DEBT <i></i></div><p class="tagline">Tiny goblins.<br>Enormous outstanding balance.</p><div class="title-actions"><button class="primary" data-action="play">${d.kills ? 'CONTINUE THE DEBT' : 'ENTER THE MIRE'} <span>↗</span></button><button class="secondary" data-action="settings">${this.settingsOpen ? 'Close settings' : 'Settings & saves'}</button></div>${this.settingsOpen ? this.settingsMarkup() : `<div class="title-progress"><b>${format(d.kills)}</b><span> / 150,000 GOBLINS</span><div class="progress-track"><i style="width:${Math.min(100, d.kills / GOAL * 100)}%"></i></div></div>`}<div class="save-note">${this.saveNote()}</div></section><aside class="field-guide"><span class="tiny-label">YOUR ONLY ASSIGNMENT</span><h2>Clear the mire.<br>Enjoy the mess.</h2><p>Run fast. Hit hard. Turn Shekkles into better problems at the amber forge.</p><div class="guide-divider"></div><span class="tiny-label">NO LESSONS. JUST BUTTONS.</span>${this.controlsMarkup()}<p class="mouse-note">Click Play to capture your mouse.<br><kbd>ESC</kbd> releases it and pauses the game.</p></aside></div><div class="menu-bottom"><span>ORIGINAL FANTASY MAYHEM</span><span>ONE MIRE. 150,000 BAD NEIGHBOURS.</span></div>`;
     } else if (screen === 'pause') {
-      this.menu.innerHTML = `<section class="panel pause-panel"><span class="tiny-label">THE GOBLINS CAN WAIT</span><h2>Catch your breath.</h2><p class="muted">${format(d.kills)} down. ${format(Math.max(0, GOAL - d.kills))} to go.</p><button class="primary" data-action="resume">BACK TO IT <span>↗</span></button>${this.settingsMarkup()}<details class="controls-details"><summary>Controls</summary>${this.controlsMarkup()}</details><p class="save-note">${this.saveNote()}</p></section>`;
+      this.menu.innerHTML = `<section class="panel pause-panel"><span class="tiny-label">THE GOBLINS CAN WAIT</span><h2>Catch your breath.</h2><p class="muted">${format(d.kills)} down. ${format(Math.max(0, GOAL - d.kills))} to go.</p><button class="primary" data-action="resume">BACK TO IT <span>↗</span></button><div class="save-buttons"><button data-action="arsenal">Weapon arsenal · Tab</button><button data-action="towers">Inspect towers · B</button></div>${this.settingsMarkup()}<details class="controls-details"><summary>Controls</summary>${this.controlsMarkup()}</details><p class="save-note">${this.saveNote()}</p></section>`;
     } else if (screen === 'shop') {
-      this.menu.innerHTML = `<section class="panel shop-panel"><header class="shop-header"><div><span class="tiny-label">THE AMBER FORGE</span><h2>Spend brass.<br>Make trouble.</h2></div><div class="shop-balance"><span class="tiny-label">YOUR BRASS</span><b>◈ ${format(d.coins)}</b><button class="secondary" data-action="resume">Back to the mire ↗</button></div></header><div class="shop-grid">${SHOP_ITEMS.map(item => {
+      this.menu.innerHTML = `<section class="panel shop-panel"><header class="shop-header"><div><span class="tiny-label">THE AMBER FORGE</span><h2>Spend Shekkles.<br>Make trouble.</h2></div><div class="shop-balance"><span class="tiny-label">YOUR SHEKKLES</span><b>◈ ${format(d.coins)}</b><button class="secondary" data-action="resume">Back to the mire ↗</button></div></header><div class="shop-grid">${SHOP_ITEMS.map(item => {
         const level = this.progression.getLevel(item.id), maxed = level >= (item.max || 1), afford = this.progression.canBuy(item.id);
-        return `<article class="shop-card ${maxed ? 'owned' : ''}"><div class="item-heading"><span class="item-icon">${item.icon}</span><span class="tiny-label">${item.label}</span></div><h3>${item.name}</h3><p>${item.description}</p><div class="item-footer">${item.max ? `<span class="ranks" aria-label="Rank ${level} of ${item.max}">${'▰'.repeat(level)}<span>${'▱'.repeat(item.max - level)}</span></span>` : '<span></span>'}<button data-action="purchase" data-id="${item.id}" ${maxed || !afford ? 'disabled' : ''} class="${afford ? 'affordable' : ''}">${maxed ? '✓ OWNED' : `◈ ${format(this.progression.getCost(item.id))}`}</button></div></article>`;
-      }).join('')}</div><p class="save-note">All purchases are permanent. No refunds. The goblins insisted. <span class="shop-exit">ESC · RETURN</span></p></section>`;
+        return `<article class="shop-card ${maxed ? 'owned' : ''}"><div class="item-heading"><span class="item-icon">${item.icon}</span><span class="tiny-label">${item.label}</span></div>${WEAPONS[item.id]?this.previewMarkup(item.id):''}<h3>${item.name}</h3><p>${item.description}${WEAPONS[item.id]?`<br><strong>${WEAPONS[item.id].damage} damage · ${(1/WEAPONS[item.id].cooldown).toFixed(1)} attacks/s</strong>`:''}</p><div class="item-footer">${item.max ? `<span class="ranks" aria-label="Rank ${level} of ${item.max}">${'▰'.repeat(level)}<span>${'▱'.repeat(item.max - level)}</span></span>` : '<span></span>'}<button data-action="purchase" data-id="${item.id}" ${maxed || !afford ? 'disabled' : ''} class="${afford ? 'affordable' : ''}">${maxed ? '✓ OWNED' : `◈ ${format(this.progression.getCost(item.id))}`}</button></div></article>`;
+      }).join('')}</div><h3>Build a watch. Keep the hunt moving.</h3><p class="muted">Choose a defence, then click a green placement preview. No Shekkles spent until placement. Maximum 16 towers.</p><div class="shop-grid">${Object.entries(TOWER_TYPES).map(([id,t])=>`<article class="shop-card"><div class="item-heading"><span class="item-icon">♜</span><span class="tiny-label">DEFENCE · ${t.range}m RANGE</span></div><h3>${t.name}</h3><p>${t.description}</p><button data-action="purchase" data-id="tower:${id}" ${d.coins<t.cost||d.towers.length>=16?'disabled':''}>PLACE · ${format(t.cost)} Shekkles</button></article>`).join('')}</div><p class="save-note">Excalibur is exclusive to Oath Hill. Earn 20,000 lifetime kills, then pull it from the stone. Purchases are permanent.</p></section>`;
     } else if (screen === 'death') {
-      this.menu.innerHTML = `<section class="panel ending-panel"><span class="tiny-label">A MINOR INCONVENIENCE</span><div class="ending-symbol">✛</div><h2>Briefly horizontal.</h2><p>The goblins took a little brass.<br>Your kills and unlocks are yours forever.</p><div class="ending-stat">${format(d.kills)}<span>GOBLINS STILL VERY DEAD</span></div><button class="primary" data-action="play">GET BACK UP <span>↗</span></button></section>`;
+      this.menu.innerHTML = `<section class="panel ending-panel"><span class="tiny-label">A MINOR INCONVENIENCE</span><div class="ending-symbol">✛</div><h2>Briefly horizontal.</h2><p>The goblins took a few Shekkles.<br>Your kills and unlocks are yours forever.</p><div class="ending-stat">${format(d.kills)}<span>GOBLINS STILL VERY DEAD</span></div><button class="primary" data-action="play">GET BACK UP <span>↗</span></button></section>`;
     } else if (screen === 'victory') {
       this.menu.innerHTML = `<section class="panel ending-panel victory-panel"><span class="tiny-label">THE MIRE IS YOURS</span><div class="ending-symbol">✳</div><h2>Debt.<br>Obliterated.</h2><p>150,000 goblins. One spectacular accounting error.<br>For the first time in centuries, the bells are quiet.</p><div class="ending-stat">${format(d.kills)}<span>GENUINE GOBLINS. GENUINELY GONE.</span></div><button class="primary" data-action="resume">TAKE A VICTORY LAP <span>↗</span></button><p class="save-note">Your victory and progress are saved. The mire remains open.</p></section>`;
     }
   }
+  previewMarkup(id){const src=this.previews?.[id];return src?`<img class="weapon-preview" src="${src}" alt="${WEAPONS[id].name} weapon model">`:'';}
+  reward(){this.rewardUntil=performance.now()+350;}
   update(state) {
     this.last = { ...this.last, ...state };
     const s = this.last;
     const write = (id, value) => { const el = this.root.querySelector(`#${id}`); if (el && el.textContent !== String(value)) el.textContent = value; };
     write('kill-number', format(s.kills ?? this.progression.data.kills));
     write('coin-number', format(s.coins ?? this.progression.data.coins));
+    write('earned-number',`${format(this.progression.data.totalEarned)} earned`);
+    write('reward-tick',performance.now()<(this.rewardUntil||0)?'+1 Shekkle / goblin':'');
+    write('excalibur-progress',this.progression.data.owned.includes('excalibur')?'✦ EXCALIBUR CLAIMED':`OATH HILL · ${format(Math.min(20000,s.kills||0))} / 20,000 souls`);
+    write('special-status',s.special||'');const place=this.root.querySelector('#placement-prompt');place.hidden=!s.placement;if(s.placement)place.textContent=s.placement;
     write('health-number', Math.max(0, Math.ceil(s.health ?? 100)));
     write('zone-name', s.zone || 'Mourning Courtyard');
     write('weapon-name', weaponNames[s.weapon] || s.weapon || 'Rustbite');
     const ammo = this.root.querySelector('#ammo-display');
     if (s.ammo !== undefined && s.ammo !== null && s.ammo !== Infinity && s.ammo >= 0) {
-      ammo.innerHTML = `<strong>${s.ammo}</strong> <span>/ ${s.reserve ?? '∞'}</span> <kbd>R</kbd>`;
-    } else ammo.textContent = 'UNLIMITED BAD INTENTIONS';
+      const markup=`<strong>${s.ammo}</strong> <span>/ ${s.reserve ?? '∞'}</span> <kbd>R</kbd>`;if(this.lastAmmo!==markup){ammo.innerHTML=markup;this.lastAmmo=markup;}
+    } else if(this.lastAmmo!=='melee'){ammo.textContent = 'UNLIMITED BAD INTENTIONS';this.lastAmmo='melee';}
     this.root.querySelector('#health-bar').style.width = `${Math.min(100, Math.max(0, s.health ?? 100))}%`;
     this.root.querySelector('.vital-box').classList.toggle('critical', (s.health ?? 100) < 30);
     this.root.querySelector('#debt-progress').style.width = `${Math.min(100, (s.kills ?? 0) / GOAL * 100)}%`;
@@ -150,7 +167,7 @@ export class GameUI {
     write('streak-number', `${streak} ×`);
     const interact = this.root.querySelector('#interact-prompt');
     interact.hidden = !s.interact;
-    if (s.interact) { interact.replaceChildren(); const key = document.createElement('kbd'); key.textContent = 'E'; interact.append(key, document.createTextNode(` ${s.interact}`)); }
+    if (s.interact&&this.lastInteract!==s.interact) { interact.replaceChildren(); const key = document.createElement('kbd'); key.textContent = 'E'; interact.append(key, document.createTextNode(` ${s.interact}`));this.lastInteract=s.interact; }
   }
   notify(text, kind = '') {
     const box = document.createElement('div'); box.className = `notification ${kind}`; box.textContent = text;
