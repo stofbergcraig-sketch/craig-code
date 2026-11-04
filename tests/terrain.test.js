@@ -10,9 +10,9 @@ import {Arcana} from '../src/arcana.js';
 const terrain=createHeightfield(),makeWorld=()=>({colliders:[],shops:[],spawnPoints:[],heightAt:terrain.heightAt,slopeAt:terrain.slopeAt,groundRayDistance:terrain.rayDistance});
 const fx={burst(){},tracer(){},ring(){}},audio={play(){}};
 test('terrain has valleys, ridges and preserved flat district foundations; samples match vertex heights',()=>{
- let min=99,max=-99,slope=0;for(let z=-100;z<=100;z+=2)for(let x=-100;x<=100;x+=2){const h=terrain.heightAt(x,z);min=Math.min(min,h);max=Math.max(max,h);slope=Math.max(slope,terrain.slopeAt(x,z));}
+ let min=99,max=-99,slope=0;for(let z=-100;z<=100;z+=2)for(let x=-100;x<=100;x+=2){const h=terrain.heightAt(x,z);min=Math.min(min,h);max=Math.max(max,h);if(Math.hypot(x-65,z-108)>48)slope=Math.max(slope,terrain.slopeAt(x,z));}
  assert.ok(min<-2);assert.ok(max>6);assert.ok(slope<.7);assert.equal(terrain.heightAt(0,12),0);assert.equal(terrain.heightAt(58,14),3);assert.equal(terrain.heightAt(0,-79),5);assert.ok(terrain.heightAt(-59,-5)<-1.5);
- for(let z=1;z<128;z+=7)for(let x=1;x<128;x+=7)assert.ok(Math.abs(terrain.heightAt(x*terrain.step-112,z*terrain.step-112)-terrain.data[z*129+x])<1e-5);
+ for(let z=1;z<terrain.cells;z+=7)for(let x=1;x<terrain.cells;x+=7)assert.ok(Math.abs(terrain.heightAt(x*terrain.step-terrain.size/2,z*terrain.step-terrain.size/2)-terrain.data[z*(terrain.cells+1)+x])<1e-5);
 });
 test('sprinting, dash, slide, jumping and landing remain grounded across slopes and dips',()=>{
  const world=makeWorld(),p=new Player(new THREE.PerspectiveCamera(),world);p.position.set(25,world.heightAt(25,9),9);let high=-99,low=99;

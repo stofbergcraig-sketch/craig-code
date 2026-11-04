@@ -56,6 +56,10 @@ export class GameAudio {
     this.last.set(name, t);
     const v = Math.max(.05, Math.min(1.5, intensity)), p = .92 + Math.random() * .16;
     switch (name) {
+      case 'frost':
+        this.noise(.24,.28*v,5300,'highpass');this.tone(1900,650,.32,.14*v,'triangle');this.tone(680,340,.22,.12*v);break;
+      case 'soulforge':
+        this.tone(75,42,.4,.3*v,'sawtooth');this.tone(380,150,.28,.16*v,'triangle');this.noise(.26,.18*v,1800,'bandpass');break;
       case 'magic':
         this.tone(520,155,.22,.25*v,'triangle');this.tone(970,390,.16,.1*v);this.noise(.15,.14*v,2300,'bandpass');break;
       case 'bolt':

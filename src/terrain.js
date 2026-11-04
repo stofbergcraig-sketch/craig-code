@@ -1,6 +1,8 @@
 // One sampled heightfield is shared by rendering, movement, AI and projectiles.
 // Triangle interpolation matches Three.js PlaneGeometry's diagonal exactly.
-export const TERRAIN_SIZE=224, TERRAIN_CELLS=128;
+import {MAP_LIMIT} from './config.js';
+import {OATH_MOUNTAIN,nearestOathTrail,isOathTrail,OATH_ROUTE} from './oath-route.js';
+export const TERRAIN_SIZE=336, TERRAIN_CELLS=192;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const smooth=v=>{v=clamp(v,0,1);return v*v*(3-2*v);};
 const mound=(x,z,cx,cz,h,rx,rz)=>h*Math.exp(-(((x-cx)/rx)**2+((z-cz)/rz)**2));
@@ -10,6 +12,12 @@ export function landscapeHeight(x,z){
   // Existing districts keep level foundations and broad, smooth approach slopes.
   const pads=[[58,14,28,29,17,3],[0,-79,27,24,20,5],[-59,-5,19,25,15,-1.6],[-78,-40,10,8,13,-.6],[18,60,15,15,15,1.2],[0,85,8,5,14,1.2],[0,7,25,28,13,0]];
   for(const [cx,cz,rx,rz,blend,level] of pads){const outside=Math.max(Math.abs(x-cx)-rx,Math.abs(z-cz)-rz,0);h+=(level-h)*(1-smooth(outside/blend));}
+  // New surroundings are added outside the preserved central districts.
+  const outer=smooth((Math.max(Math.abs(x),Math.abs(z))-91)/28);
+  h+=outer*(mound(x,z,-132,-27,7,26,55)+mound(x,z,36,-137,6,70,25)+mound(x,z,134,32,5,25,65)-mound(x,z,-94,131,3,35,28));
+  const r=Math.hypot(x-OATH_MOUNTAIN.x,z-OATH_MOUNTAIN.z);
+  if(r<44){const hill=1.2+30*smooth((42-r)/38);h+=(hill-h)*(1-smooth((r-39)/5));}
+  if(x>12&&x<110&&z>54&&z<152){const trail=nearestOathTrail(x,z);if(trail.distance<6){const blend=1-smooth((trail.distance-3)/3);h+=(trail.point.y-h)*blend;}}
   return h;
 }
 export function createHeightfield(){
@@ -27,5 +35,5 @@ export function createHeightfield(){
       if(difference<=0)return old+(distance-old)*clamp(previous/(previous-difference||1),0,1);previous=difference;old=distance;
     }return maximum;
   }
-  return {cells,size,step,data,heightAt,slopeAt,rayDistance};
+  return {cells,size,step,data,heightAt,slopeAt,rayDistance,isOathTrail,oathRoute:OATH_ROUTE,bounds:MAP_LIMIT};
 }

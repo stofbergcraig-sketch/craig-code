@@ -23,7 +23,7 @@ export class Arcana {
     if(p.target?.active){const desired=p.target.position.clone().add(new THREE.Vector3(0,.85,0)).sub(p.position).normalize();p.direction.lerp(desired,Math.min(1,dt*7)).normalize();}
     const distance=p.speed*dt,wall=this.enemies._wallDistance(p.position,p.direction,distance);let first=null,along=wall;
     for(const e of this.enemies.enemies){if(!e.active||p.hit.has(e.id))continue;const d=this.delta.copy(e.position);d.y+=.85;d.sub(p.position);const projection=d.dot(p.direction);if(projection>=-.4&&projection<=along+.3&&d.lengthSq()-projection*projection<.75){first=e;along=Math.max(0,projection);}}
-    if(first){p.position.addScaledVector(p.direction,along);p.hit.add(first.id);this.enemies._damage(first,p.damage,p.direction,p.force);p.onHit?.(first);this.fx.burst(p.position,p.mesh.material.color.getHex(),.7);
+    if(first){p.position.addScaledVector(p.direction,along);p.hit.add(first.id);this.enemies._damage(first,p.damage,p.direction,p.force);p.onHit?.(first);if(first.active)this.fx.burst(p.position,p.mesh.material.color.getHex(),.7);
       if(p.blast)this.enemies.blast(p.position,p.blast,p.damage,p.force);
       if(p.bounce>0){p.bounce--;p.target=this.target(p.position,10,null,-1,p.hit);if(p.target){p.direction.copy(p.target.position).add(new THREE.Vector3(0,.85,0)).sub(p.position).normalize();continue;}}
       if(p.hookOrigin){p.retract=true;p.life=.7;p.target=null;continue;}

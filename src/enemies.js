@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import {MAP_LIMIT,FLEE_SPEEDS,FLEE_SPEED_MULTIPLIER,GOBLIN_DEATH_COLOR} from './config.js';
 
 // One set of instanced meshes renders the entire living crowd and its ragdolls.
 const MAX_LIVE = 650;
@@ -118,7 +119,8 @@ export class EnemySystem {
   }
 
   _clearAt(x, z, radius = .55) {
-    if (Math.abs(x) > 105 || Math.abs(z) > 105) return false;
+    const limit=this.world.bounds||MAP_LIMIT;if (Math.abs(x) > limit || Math.abs(z) > limit) return false;
+    if((this.world.slopeAt?.(x,z)||0)>.72)return false;
     const floor=this.world.heightAt?.(x,z)||0;
     for (const b of this.world.colliders || []) {
       if (!b.legendary && ((b.y || 0) > floor+1.6 || (b.y||0)+b.h<floor+.2 || b.h < .45)) continue;
@@ -141,6 +143,7 @@ export class EnemySystem {
     e.yaw = Math.random() * Math.PI * 2; e.stun = 0; e.flash = 0;
     e.attack = .4 + Math.random() * .7; e.lastChain = -10;
     e.panic=0;e.think=0;e.fleeX=0;e.fleeZ=1;e.stumbleAt=2+Math.random()*5;e.stumble=0;
+    e.slowTime=0;e.slowFactor=1;e.gait=e.phase;
     this._alive++;
     return e;
   }
@@ -150,10 +153,12 @@ export class EnemySystem {
     const target = Math.min(this.maxAlive, 52 + Math.sqrt(kills) * 4.4);
     const rate = Math.min(this.spawnRateCap, 10 + Math.sqrt(kills) * 1.9);
     this._budget = Math.min(55, this._budget + dt * rate);
+    const sectors=new Uint16Array(8);for(const e of this.enemies)if(e.active&&e.position.distanceToSquared(player.position)<2304){const a=Math.atan2(e.position.x-player.position.x,e.position.z-player.position.z);sectors[Math.floor((a+Math.PI)/(Math.PI*2)*8)%8]++;}
     let tries = 0;
     while (this._budget >= 1 && this._alive < target && tries++ < 28) {
-      const angle = Math.random() * Math.PI * 2;
-      const distance = 15 + Math.random() * 18;
+      const a=Math.floor(Math.random()*8),b=Math.floor(Math.random()*8),sector=sectors[a]<sectors[b]?a:b;
+      const angle=-Math.PI+(sector+Math.random())*Math.PI/4;
+      const distance = 11 + Math.random() * 20;
       let x = player.position.x + Math.sin(angle) * distance;
       let z = player.position.z + Math.cos(angle) * distance;
       if (Math.random() < .2 && this.world.spawnPoints?.length) {
@@ -165,7 +170,7 @@ export class EnemySystem {
       if (kills > 50 && Math.random() < .19) type = 1;
       if (kills > 200 && Math.random() < .12) type = 2;
       const spawned = this.spawn(x, z, type);
-      if (spawned) this._budget--;
+      if (spawned) {this._budget--;sectors[sector]++;}
     }
   }
 
@@ -209,7 +214,7 @@ export class EnemySystem {
         collided = true;
       }
     }
-    p.x = THREE.MathUtils.clamp(p.x, -105, 105); p.z = THREE.MathUtils.clamp(p.z, -105, 105);
+    const limit=this.world.bounds||MAP_LIMIT;p.x = THREE.MathUtils.clamp(p.x, -limit, limit); p.z = THREE.MathUtils.clamp(p.z, -limit, limit);
     const floor=this.world.heightAt?.(p.x,p.z)||0;if(grounded)p.y=floor;else if(p.y<floor){p.y=floor;e.velocity.y=0;}
     return collided;
   }
@@ -222,6 +227,8 @@ export class EnemySystem {
     for (const e of this.enemies) {
       if (!e.active) continue;
       const t = TYPES[e.type], p = e.position;
+      const beforeX=p.x,beforeZ=p.z;
+      e.slowTime=Math.max(0,e.slowTime-dt);if(e.slowTime===0)e.slowFactor=1;
       const ground=this.world.heightAt?.(p.x,p.z)||0;
       const dx = player.position.x - p.x, dz = player.position.z - p.z;
       const distance = Math.hypot(dx, dz);
@@ -243,20 +250,25 @@ export class EnemySystem {
         if(e.think<=0){
           e.think=.18+Math.random()*.06;
           if(e.panic>0)this._near(p,other=>{if(other!==e&&other.panic<.5)other.panic=1.4;});
-          const away=e.panic>0?Math.atan2(-dx,-dz):e.yaw+Math.sin(time*.3+e.phase)*.15;
+          const limit=this.world.bounds||MAP_LIMIT,edgeDistance=limit-Math.max(Math.abs(p.x),Math.abs(p.z));
+          let desiredX=e.panic>0?-dx/Math.max(distance,.01):Math.sin(e.yaw+.15*Math.sin(time*.3+e.phase));
+          let desiredZ=e.panic>0?-dz/Math.max(distance,.01):Math.cos(e.yaw+.15*Math.sin(time*.3+e.phase));
+          const inward=Math.max(0,1-edgeDistance/27)*2.8;
+          desiredX-=p.x/limit*inward;desiredZ-=p.z/limit*inward;
+          const away=Math.atan2(desiredX,desiredZ);
           let best=-Infinity;
           // Score stable headings against future clearance. Prefer broad arcs to jitter.
           for(const turn of [0,.45,-.45,.9,-.9,1.5,-1.5,2.2,-2.2,Math.PI]){
             const angle=away+turn,tx=Math.sin(angle),tz=Math.cos(angle);
             let clearance=4.5;
             for(const step of [.9,2.2,4.5]){if(!this._clearAt(p.x+tx*step,p.z+tz*step,.65)){clearance=step-.9;break;}}
-            const edge=Math.max(0,Math.abs(p.x+tx*5)-97)+Math.max(0,Math.abs(p.z+tz*5)-97);
+            const edge=Math.max(0,Math.abs(p.x+tx*5)-(limit-12))+Math.max(0,Math.abs(p.z+tz*5)-(limit-12));
             const score=clearance*3+Math.cos(turn)*1.8+(tx*e.fleeX+tz*e.fleeZ)*.65-edge*6;
             if(score>best){best=score;e.fleeX=tx;e.fleeZ=tz;}
           }
         }
         let vx=e.fleeX,vz=e.fleeZ;
-        const speed=e.stumble>0?1.8:e.panic>0?(distance<2.5?7.5:e.type===1?13.1:e.type===2?11.9:12.5):1.5;
+        const speed=(e.stumble>0?1.8*FLEE_SPEED_MULTIPLIER:e.panic>0?(distance<2.5?7.5*FLEE_SPEED_MULTIPLIER:FLEE_SPEEDS[e.type]):1.5)*e.slowFactor;
         e.velocity.x = THREE.MathUtils.damp(e.velocity.x,vx*speed,8,dt); e.velocity.z = THREE.MathUtils.damp(e.velocity.z,vz*speed,8,dt);
         // Tiny local repulsion keeps the crowd readable without an O(n²) solve.
         if ((e.id & 1) === (Math.floor(time * 60) & 1)) this._near(p, other => {
@@ -275,6 +287,7 @@ export class EnemySystem {
           this.onPlayerHit(t.damage); this._hitCooldown = .16; e.attack = .9 + Math.random() * .5;
         }
       }
+      e.gait+=Math.hypot(p.x-beforeX,p.z-beforeZ)*1.8;
     }
     for (let i = this.corpses.length - 1; i >= 0; i--) {
       const c = this.corpses[i]; c.life -= dt;
@@ -317,7 +330,7 @@ export class EnemySystem {
     e.velocity.addScaledVector(direction, force);
     e.velocity.y = Math.max(e.velocity.y, Math.min(10, force * .28));
     this._tmp.copy(e.position); this._tmp.y += .75;
-    this.onImpact(this._tmp.clone(), 0xa7d93a, e.hp <= 0 ? 1 : .45);
+    this.onImpact(this._tmp.clone(), e.hp<=0?GOBLIN_DEATH_COLOR:0xb54342, e.hp <= 0 ? 1 : .45);
     if (e.hp <= 0) this._kill(e);
     return true;
   }
@@ -406,6 +419,8 @@ export class EnemySystem {
     }
     return hits;
   }
+  slow(e,duration=3,factor=.55){if(!e?.active)return false;e.slowTime=Math.max(e.slowTime,duration);e.slowFactor=Math.min(e.slowFactor||1,factor);return true;}
+  slowArea(position,radius,duration,factor){let count=0;for(const e of this.enemies)if(e.active&&e.position.distanceToSquared(position)<=radius*radius){this.slow(e,duration,factor);count++;}return count;}
 
   _render(time) {
     let index = 0;
@@ -419,7 +434,7 @@ export class EnemySystem {
 
   _renderOne(e, index, time, dead) {
     const type = TYPES[e.type], scale = type.scale;
-    const walk = dead ? 0 : Math.sin(time * (e.panic>0?23:e.type === 1 ? 18 : 11) + e.phase);
+    const walk = dead ? 0 : Math.sin(e.gait??e.phase);
     const bob = dead ? 0 : Math.abs(walk) * .055;
     const object = this._object, part = this._part;
     object.position.copy(e.position); object.position.y += bob;
@@ -427,7 +442,7 @@ export class EnemySystem {
     const fade = dead ? Math.min(1, e.life * 2) : 1;
     object.scale.setScalar(scale * fade); object.updateMatrix();
     this._root.copy(object.matrix);
-    this._color.setHex(!dead && e.flash > 0 ? 0xffd5b0 : type.tint);
+    this._color.setHex(!dead && e.flash > 0 ? 0xffd5b0 : !dead&&e.slowTime>0?0x99caed:type.tint);
     for (const { name, mesh } of this.meshes) {
       part.position.set(0, 0, 0); part.rotation.set(0, 0, 0); part.scale.setScalar(1);
       switch (name) {

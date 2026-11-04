@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {MAP_LIMIT} from './config.js';
 
 export class Player {
   constructor(camera, world, cue = () => {}) {
@@ -32,7 +33,10 @@ export class Player {
     const radius=.38, height=this.slideTime>0?1.05:1.72;
     // Resolve axes separately, allowing a small automatic step onto low stonework.
     for(const axis of ['x','z']) {
+      const before=this.position[axis],oldGround=this.world.heightAt?.(this.position.x,this.position.z)||0;
       this.position[axis]+=this.velocity[axis]*dt;
+      const rise=(this.world.heightAt?.(this.position.x,this.position.z)||0)-oldGround,travel=Math.abs(this.position[axis]-before);
+      if(this.world.heightAt&&rise>travel*.72+.025&&(wasGrounded||this.position.y<(oldGround+rise)-.32)){this.position[axis]=before;this.velocity[axis]=0;}
       for(const b of this.world.colliders){
         const bottom=b.y||0,top=bottom+b.h;
         if(this.position.y>=top-.02||this.position.y+height<=bottom+.02)continue;
@@ -52,7 +56,7 @@ export class Player {
     }
     if(this.position.y<=floor||(wasGrounded&&this.velocity.y<=0&&this.position.y-floor<.65)){const landed=!this.grounded;this.position.y=floor;this.velocity.y=0;this.grounded=true;this.jumps=0;if(landed&&this.slam)this.cue('slam');this.slam=false;}
     else {this.grounded=false;if(this.jumps===0)this.jumps=1;}
-    this.position.x=THREE.MathUtils.clamp(this.position.x,-105,105);this.position.z=THREE.MathUtils.clamp(this.position.z,-105,105);
+    const limit=this.world.bounds||MAP_LIMIT;this.position.x=THREE.MathUtils.clamp(this.position.x,-limit,limit);this.position.z=THREE.MathUtils.clamp(this.position.z,-limit,limit);
     this.step+=Math.hypot(this.velocity.x,this.velocity.z)*dt;
     const eye=this.slideTime>0?1:1.7;
     this.eyeHeight=THREE.MathUtils.lerp(this.eyeHeight||1.7,eye,1-Math.exp(-dt*18));

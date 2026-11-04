@@ -17,10 +17,10 @@ let renderer;
 try { renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'}); }
 catch {root.innerHTML='<div style="padding:3rem;color:white;background:#142b2a;font-family:sans-serif"><h1>MIREBREAK needs WebGL</h1><p>Please enable hardware acceleration in Chrome or Edge and restart the browser.</p></div>';throw new Error('WebGL unavailable');}
 renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;root.appendChild(renderer.domElement);renderer.domElement.id='game-canvas';
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x183536);scene.fog=new THREE.FogExp2(0x234541,.012);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x183536);scene.fog=new THREE.FogExp2(0x234541,.009);
 scene.add(new THREE.HemisphereLight(0xb7d5bf,0x28231d,2.2));
 const sun=new THREE.DirectionalLight(0xffdb9d,2.8);sun.position.set(-40,65,20);scene.add(sun);
-const camera=new THREE.PerspectiveCamera(76,innerWidth/innerHeight,.05,230);
+const camera=new THREE.PerspectiveCamera(76,innerWidth/innerHeight,.05,350);
 const world=createWorld(scene),fx=new Effects(scene,world),audio=new GameAudio(),progress=new Progression();
 const keys=new Set();let state='title',started=false,time=0,last=performance.now(),weapon='sword',attackTimer=0,reloadTimer=0,quickTimer=0,trapCooldown=0,hitStop=0,shake=0,lastHurt=-10,streak=0,streakTimer=0,saveTimer=0,mouseDown=false,shotCounter=0,pendingVictory=false;
 const ammo={shotgun:8,repeater:32};const traps=[];let ui;

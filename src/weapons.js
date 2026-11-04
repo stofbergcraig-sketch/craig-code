@@ -15,6 +15,7 @@ export const WEAPONS = {
 };
 
 const mat = (color, roughness = .65, metalness = .15) => new THREE.MeshStandardMaterial({ color, roughness, metalness, flatShading: true });
+export const VIEW_SCALES=Object.freeze({sword:.8,axe:.8,hammer:.8,gravebreaker:.8,excalibur:.8});
 const PALETTE = {
   iron: mat(0x738e91, .34, .7), lightIron: mat(0xb5c4b6, .35, .6), darkIron: mat(0x253b3c, .53, .6),
   edge: mat(0xdce5cf, .25, .7), gold: mat(0xb98d48, .42, .65), leather: mat(0x553b30, .8),
@@ -202,7 +203,7 @@ export class WeaponView {
     const rim = new THREE.DirectionalLight(0x70e8ce, 1.8); rim.position.set(2, 1, -3); this.scene.add(rim);
     this.root = new THREE.Group(); this.scene.add(this.root);
     this.models = { fists: buildFists(), sword: buildSword(), axe: buildAxe(), hammer: buildHammer(), shotgun: buildGun(false), repeater: buildGun(true),gravehook:buildHook(),gravebreaker:buildGravebreaker(),eclipse:buildSigil(),excalibur:buildLegendarySword() };
-    for (const model of Object.values(this.models)) { this.root.add(model.group); model.group.visible = false; }
+    for (const [id,model] of Object.entries(this.models)) {model.group.scale.multiplyScalar(VIEW_SCALES[id]||1);this.root.add(model.group); model.group.visible = false; }
     this.id = 'fists'; this.age = 10; this.switchAge = 1; this.reloadAge = 0; this.reloadDuration = 0; this.recoil = 0; this.alternate = false;
     this.bobPhase = 0; this.sway = new THREE.Vector2(); this.setWeapon('fists');
   }
@@ -236,6 +237,7 @@ export class WeaponView {
     this.sway.x = THREE.MathUtils.damp(this.sway.x, THREE.MathUtils.clamp(lookX, -.08, .08), 8, dt);
     this.sway.y = THREE.MathUtils.damp(this.sway.y, THREE.MathUtils.clamp(lookY, -.05, .05), 8, dt);
     this.root.position.set(baseX + Math.sin(this.bobPhase) * .015 * bob - this.sway.x, -.34 + Math.cos(this.bobPhase * 2) * .012 * bob - this.sway.y, -.58);
+    if(VIEW_SCALES[this.id]){this.root.position.x+=.025;this.root.position.y-=.035;}
     this.root.rotation.set(.015 * Math.cos(time * 1.8), 0, .015 * Math.sin(time * 1.4));
     if (sliding) { this.root.position.y -= .06; this.root.rotation.z -= .12; }
     if (sprinting && speed > 5) { this.root.position.y -= .055+Math.abs(Math.sin(this.bobPhase))*.025; this.root.rotation.z += .14;this.root.rotation.x+=Math.cos(this.bobPhase)*.025; }

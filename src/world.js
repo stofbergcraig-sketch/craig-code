@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import {createHeightfield} from './terrain.js';
+import {MAP_LIMIT} from './config.js';
+import {OATH_ROUTE,isOathTrail} from './oath-route.js';
 
 // Everything in Mirebreak is built here from original geometry and pixel textures.
 // Collision coordinates describe solid boxes, with y measured from the ground.
@@ -79,7 +81,7 @@ export function createWorld(scene) {
   moonContext.lineWidth=2;moonContext.beginPath();moonContext.moveTo(157,105);moonContext.lineTo(192,119);moonContext.lineTo(223,102);moonContext.moveTo(116,145);moonContext.lineTo(77,135);moonContext.lineTo(35,157);moonContext.stroke();
   const moonMap=new THREE.CanvasTexture(moonCanvas);moonMap.colorSpace=THREE.SRGBColorSpace;
   const moon=new THREE.Mesh(new THREE.PlaneGeometry(29,29),new THREE.MeshBasicMaterial({map:moonMap,transparent:true,depthWrite:false,fog:false,color:0x97b5a8}));
-  moon.position.set(-48,65,-142);moon.lookAt(0,0,0);scene.add(moon);
+  moon.position.set(-96,95,-232);moon.scale.setScalar(1.5);moon.lookAt(0,0,0);scene.add(moon);
   moon.userData.sky=true;
   const buckets = new Map(), dummy = new THREE.Object3D();
   function put(type, material, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) {
@@ -97,7 +99,7 @@ export function createWorld(scene) {
     for(let i=0;i<p.count;i++)p.setY(i,terrain.heightAt(x+p.getX(i),z+p.getZ(i))+offset);
     geometry.computeVertexNormals();geometry.computeBoundingSphere();return geometry;
   }
-  const groundGeometry=surface(224,224,0,0),colors=[];const color=new THREE.Color();
+  const groundGeometry=surface(terrain.size,terrain.size,0,0),colors=[];const color=new THREE.Color();
   for(let i=0;i<groundGeometry.attributes.position.count;i++){const p=groundGeometry.attributes.position,x=p.getX(i),z=p.getZ(i),h=p.getY(i);color.setHex(h<-.8?0x7e998a:terrain.slopeAt(x,z)>.25?0x9d9b88:h>3.5?0xb0b39a:0x9eb19a);colors.push(color.r,color.g,color.b);}
   groundGeometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
   const ground = new THREE.Mesh(groundGeometry, mat(0xabb9a1, { map: mudMap,vertexColors:true }));
@@ -177,6 +179,7 @@ export function createWorld(scene) {
   shopRing.rotation.x=-Math.PI/2; shopRing.position.set(-7,0.035,5); scene.add(shopRing);
 
   function tree(x,z,scale=1,dead=false) {
+    if(isOathTrail(x,z,5))return;
     const h=range(8,13)*scale;
     put('cylinder','bark',x,h/2,z,0.85*scale,h,0.85*scale,0,0,range(-0.04,0.04));
     if (scale>0.8) colliders.push({x,z,w:0.9*scale,d:0.9*scale,h,y:terrain.heightAt(x,z)});
@@ -294,6 +297,7 @@ export function createWorld(scene) {
   // Broken rock shelves frame the new ridges; the broad approach lanes stay clear.
   for(const [cx,cz]of [[-85,45],[-53,-57],[88,-41],[66,73]])for(let i=0;i<4;i++){
     const x=cx+i*2.1-3.1,z=cz+Math.sin(i)*1.4,h=1.8+Math.sin(i*1.8)*.6;
+    if(isOathTrail(x,z,5))continue;
     put('rock','darkStone',x,h*.45,z,3.8,h*1.5,3.5,0,i*.5,.1);colliders.push({x,z,w:2.6,d:2.5,h,y:terrain.heightAt(x,z)});
     put('rock','moss',x,h+.15,z,2.1,.5,2.1,0,i,.1);
   }
@@ -303,13 +307,27 @@ export function createWorld(scene) {
     if(i%3===0)put('rock','moss',x,0.18,z,range(0.2,1),range(0.2,0.6),range(0.2,1),random(),random(),random());
     else put('cone','grass',x,range(0.15,0.3),z,range(0.2,0.6),range(0.3,0.8),range(0.2,0.6),0,random(),range(-0.2,0.2));
   }
-  for(let side=0;side<4;side++)for(let i=0;i<17;i++) {
-    const a=-108+i*13.5,x=side<2?a:(side===2?-109:109),z=side<2?(side===0?-109:109):a;
+  // New outer districts use the same materials; the original landmarks stay put.
+  arch(-132,-24,9,9);label('THE ASHEN MARCH',-132,6.5,-22.3,8);
+  for(const x of [-142,-122]){solid(x,-36,3,5,8,'darkStone');put('cone','roof',x,10,-36,6,5,7,0,.4);}
+  for(const x of [-12,6,24,42])arch(x,-135,10,8);
+  label('BROKEN CROWN RIDGE',6,6,-133.3,10);
+  for(let i=0;i<9;i++){const angle=i*Math.PI*2/9,x=134+Math.sin(angle)*10,z=34+Math.cos(angle)*10;solid(x,z,1.1,1.1,range(2.2,4.8),'darkStone');put('sphere','purple',x,4.7,z,.6,.9,.6);}
+  torch(133,32,2.8,true);torch(137,36,2.8,true);
+  for(let i=0;i<90;i++){const side=i%4,x=side<2?range(-153,153):choose([-1,1])*range(115,151),z=side<2?choose([-1,1])*range(116,151):range(-153,153);if(Math.hypot(x+132,z+24)<14||Math.abs(z+135)<9||Math.hypot(x-134,z-34)<15)continue;tree(x,z,range(.65,1.25),i%3===0);}
+  for(let i=0;i<360;i++){const x=range(-154,154),z=range(-154,154);if(Math.max(Math.abs(x),Math.abs(z))<103||isOathTrail(x,z,4))continue;put(i%3?'cone':'rock',i%3?'grass':'moss',x,.2,z,range(.3,1),range(.3,.9),range(.3,1),0,random(),0);}
+  // The mountain route is visibly marked and remains broad enough to sprint on.
+  for(let i=0;i<OATH_ROUTE.length;i+=4){const p=OATH_ROUTE[i];put('box','paleStone',p.x,.03,p.z,2.3,.06,1.2,0,i*.025);}
+  for(let i=36;i<OATH_ROUTE.length-15;i+=72){const p=OATH_ROUTE[i],next=OATH_ROUTE[Math.min(i+1,OATH_ROUTE.length-1)],dx=next.x-p.x,dz=next.z-p.z,len=Math.hypot(dx,dz)||1;torch(p.x+dz/len*3.5,p.z-dx/len*3.5,2.5,true);}
+  for(const x of [9.6,14.4])put('box','darkWood',x,1.5,61,.18,3,.18);
+  label('OATH HILL',12,2.7,61,5,'#d2dca8');
+  for(let side=0;side<4;side++)for(let i=0;i<25;i++) {
+    const a=-164+i*(328/24),x=side<2?a:(side===2?-165:165),z=side<2?(side===0?-165:165):a;
     put('rock','darkStone',x,range(3,7),z,range(14,24),range(13,23),range(13,21),0,random(),0);
   }
-  colliders.push({x:-110,z:0,w:4,d:224,h:50,y:-5},{x:110,z:0,w:4,d:224,h:50,y:-5},{x:0,z:-110,w:224,d:4,h:50,y:-5},{x:0,z:110,w:224,d:4,h:50,y:-5});
+  colliders.push({x:-163,z:0,w:4,d:336,h:70,y:-8},{x:163,z:0,w:4,d:336,h:70,y:-8},{x:0,z:-163,w:336,d:4,h:70,y:-8},{x:0,z:163,w:336,d:4,h:70,y:-8});
   // All spawn points must have clearance from solid scenery and be on the ground.
-  const clusters=[[-3,1],[12,1],[-11,22],[9,25],[-37,7],[-55,7],[-72,29],[-56,-30],[-85,-19],[35,9],[58,1],[61,31],[79,28],[52,-23],[0,-31],[5,-47],[0,-68],[0,-84],[-6,48],[5,73]];
+  const clusters=[[-3,1],[12,1],[-11,22],[9,25],[-37,7],[-55,7],[-72,29],[-56,-30],[-85,-19],[35,9],[58,1],[61,31],[79,28],[52,-23],[0,-31],[5,-47],[0,-68],[0,-84],[-6,48],[5,73],[-128,-20],[-128,45],[-115,113],[-58,136],[16,-128],[72,-133],[128,-100],[134,34],[129,110]];
   for(const [cx,cz]of clusters)for(let i=0;i<4;i++) {
     const x=cx+range(-3,3),z=cz+range(-3,3);
     if(!colliders.some(c=>(c.y||0)<terrain.heightAt(x,z)+1.5&&Math.abs(x-c.x)<c.w/2+1.5&&Math.abs(z-c.z)<c.d/2+1.5))spawnPoints.push({x,z});
@@ -324,8 +342,8 @@ export function createWorld(scene) {
   // Direct groups/lights share the same ground anchor as the instanced scenery.
   for(const object of scene.children)if(!initialObjects.has(object)&&!object.userData.sky&&!object.userData.anchored&&!object.userData.terrainSurface)object.position.y+=terrain.heightAt(object.position.x,object.position.z);
   return {
-    colliders,spawnPoints,shops,secrets,barrels,terrain,heightAt:terrain.heightAt,slopeAt:terrain.slopeAt,groundRayDistance:terrain.rayDistance,
-    zoneAt(x,z) { if(z < -47)return 'THE HOLLOW KEEP';if(x < -29)return 'GRAVEWOOD';if(x > 30)return 'SPLINTER CAMP';if(z>38)return 'THE OLD CAUSEWAY';return 'DEBTOR’S COURTYARD'; },
+    colliders,spawnPoints,shops,secrets,barrels,terrain,bounds:MAP_LIMIT,heightAt:terrain.heightAt,slopeAt:terrain.slopeAt,groundRayDistance:terrain.rayDistance,
+    zoneAt(x,z) { if(z<-110)return 'BROKEN CROWN RIDGE';if(x<-108)return 'THE ASHEN MARCH';if(x>110)return 'THE WITCHWARD';if(z>100)return 'THE OATH HIGHLANDS';if(z < -47)return 'THE HOLLOW KEEP';if(x < -29)return 'GRAVEWOOD';if(x > 30)return 'SPLINTER CAMP';if(z>38)return 'THE OLD CAUSEWAY';return 'DEBTOR’S COURTYARD'; },
     update(dt,time) {
       for(const a of animated) {
         if(a.type==='gem'){a.mesh.rotation.y=time;a.mesh.position.y=1.8+Math.sin(time*2+a.phase)*0.15;}

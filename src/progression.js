@@ -1,3 +1,4 @@
+import {BUILD_LIMIT} from './config.js';
 export const SAVE_KEY = 'mirebreak.goblin-debt.v1';
 export const GOAL = 150000;
 export const EXCALIBUR_KILLS = 20000;
@@ -6,7 +7,9 @@ export const TOWER_TYPES = {
   wizard:{name:'Arcane Wizard Tower',cost:12500,range:30,damage:130,cooldown:1.1,color:0x87dfca,description:'Homing arcane orbs detonate in a small radius.'},
   ballista:{name:'Cursed Ballista',cost:25000,range:38,damage:240,cooldown:1.7,color:0xb8dd74,description:'Heavy bolts pierce up to six fleeing goblins.'},
   storm:{name:'Stormcaller Tower',cost:50000,range:34,damage:150,cooldown:1.3,color:0xbea3ef,description:'Lightning arcs between up to eight goblins.'},
-  spire:{name:'Obsidian Death Spire',cost:100000,range:44,damage:450,cooldown:2,color:0xf1bf79,description:'An ancient sigil detonates across a wide area.'}
+  spire:{name:'Obsidian Death Spire',cost:100000,range:44,damage:450,cooldown:2,color:0xf1bf79,description:'An ancient sigil detonates across a wide area.'},
+  frost:{name:'Frostbound Watchtower',cost:35000,range:30,damage:25,cooldown:1.1,color:0x8cdaed,description:'Icy seekers slow fleeing goblins. Periodic frost pulses catch whole groups.'},
+  soulforge:{name:'The Soulforge Obelisk',cost:75000,range:42,damage:95,cooldown:1.25,color:0xcb8bde,description:'Floating runestone. Beams bind several targets; soul pulses scour the ground.'}
 };
 
 export const SHOP_ITEMS = [
@@ -22,7 +25,7 @@ export const SHOP_ITEMS = [
   { id: 'capacity', name: 'Deep pockets', kind: 'upgrade', cost: 140, max: 4, icon: '▥', description: '+2 shotgun shells and +8 repeater rounds per rank.', label: 'MAGAZINE SIZE' },
   { id: 'trap', name: 'Thorn engine', kind: 'upgrade', cost: 160, max: 4, icon: '✳', description: 'Press T to plant a deadly crowd-clearing trap. Higher ranks improve its power.', label: 'DEPLOYABLE · T' },
   { id: 'cataclysm', name: 'Ruin covenant', kind: 'weapon', cost: 3000, icon: '◈', description: 'Unleash enormous hammer shockwaves and slam blasts. The debt gets smaller. Fast.', label: 'LATE GAME · HAMMER / SLAM' },
-];
+].map(item=>item.kind==='weapon'?{...item,cost:Math.round(item.cost*.8)}:item);
 
 const milestones = new Map([
   [100, '100 DOWN · The marsh has noticed.'],
@@ -56,7 +59,7 @@ function sanitize(raw) {
   data.owned = [...new Set(['fists', 'sword', ...(Array.isArray(raw.owned) ? raw.owned.filter(x => weapons.has(x)) : [])])];
   if(data.kills<EXCALIBUR_KILLS)data.owned=data.owned.filter(id=>id!=='excalibur');
   data.equipped=data.owned.includes(raw.equipped)&&raw.equipped!=='cataclysm'?raw.equipped:'sword';
-  data.towers=(Array.isArray(raw.towers)?raw.towers:[]).slice(0,16).filter(t=>t&&TOWER_TYPES[t.type]&&Number.isFinite(t.x)&&Number.isFinite(t.z)&&Math.abs(t.x)<100&&Math.abs(t.z)<100).map((t,i)=>({id:i+1,type:t.type,x:t.x,z:t.z,level:Math.floor(finite(t.level,1,1,3))}));
+  data.towers=(Array.isArray(raw.towers)?raw.towers:[]).slice(0,16).filter(t=>t&&TOWER_TYPES[t.type]&&Number.isFinite(t.x)&&Number.isFinite(t.z)&&Math.abs(t.x)<=BUILD_LIMIT&&Math.abs(t.z)<=BUILD_LIMIT).map((t,i)=>({id:i+1,type:t.type,x:t.x,z:t.z,level:Math.floor(finite(t.level,1,1,3))}));
   for (const id of Object.keys(data.upgrades)) {
     const max = SHOP_ITEMS.find(x => x.id === id).max;
     data.upgrades[id] = Math.floor(finite(raw.upgrades?.[id], 0, 0, max));
@@ -132,7 +135,7 @@ export class Progression {
   }
   placeTower(type,x,z){
     const def=TOWER_TYPES[type];
-    if(!def||this.data.coins<def.cost||this.data.towers.length>=16||!Number.isFinite(x)||!Number.isFinite(z)||Math.abs(x)>=100||Math.abs(z)>=100)return null;
+    if(!def||this.data.coins<def.cost||this.data.towers.length>=16||!Number.isFinite(x)||!Number.isFinite(z)||Math.abs(x)>BUILD_LIMIT||Math.abs(z)>BUILD_LIMIT)return null;
     this.data.coins-=def.cost;const tower={id:Math.max(0,...this.data.towers.map(t=>t.id))+1,type,x,z,level:1};this.data.towers.push(tower);this.save();return tower;
   }
   towerUpgradeCost(tower){return tower&&tower.level<3?Math.round(TOWER_TYPES[tower.type].cost*.55*tower.level):Infinity;}

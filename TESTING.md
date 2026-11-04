@@ -1,5 +1,16 @@
 # Expansion validation
 
+## Highlands, pursuit and new structures
+
+- All27 named code-level scenarios pass: the previous17 plus10 new checks for exact map dimensions,20% weapon discounts, unchanged defence prices, exact75% fleeing speeds, distance-synchronised gait, smooth inward boundary steering, balanced central spawn sectors, a full timed walking ascent, foreground-only model scaling, crimson deaths, slowing expiry, outer-map save restoration and both new structures' upgrade/attack mechanics.
+- `tests/highlands-browser.mjs` passes on the actual generated map. The Player code walked from the original trail entrance to Excalibur's interaction zone in29.94 simulated seconds, without position teleportation during ascent. The marked route is318.68m long; a full centreline walk without the final stone collider is30.22s. Sprint/jump/dash shortcuts remain possible.
+- The same browser pass verifies discounted shop prices, placing and upgrading Frostbound Watchtower to level3, its0.32 slow factor, Soulforge's simultaneous real-enemy kills with matching Shekkles, both structures' save restoration, and natural goblin spawning in the new Witchward region beyond the former boundary.
+- Final mixed-load pass includes all seven defence types among16 placed structures:200 active goblins, max7 concurrent pooled projectiles, max360 particles,362 genuine kills over19.2 simulated seconds, all transforms finite, about1.67ms CPU/update. This remains a fixed-step simulation check, not a rendered frame-rate or memory endurance benchmark.
+- Visual review covers the extended mountain, its marked trail, the smaller foreground sword, Frostbound's icy silhouette, and the floating Soulforge rings. A stale placement-validity flag found during the repeat browser pass was cleared on beginning/cancelling placement; the full purchase/placement/upgrade/save flow then passed again.
+- Existing gameplay/expansion/special/HUD/terrain browser suites were rerun. These include the20,000-soul lock, extraction,150,000-kill ending, reset, purchases and saves. Production diagnostics remain development-only.
+- Important balance consequence: the exact25% speed cut takes all three straight-line fleeing speeds below the unchanged10.5m/s walk speed. Walking can now eventually catch an unobstructed goblin; sprinting at15m/s closes much faster. This preserves the explicit percentage and player speed requirements.
+- Windows GPU performance, a long human session and a full150,000-kill playthrough remain unmeasured. Movement uses local steering and sampled terrain; the30-second measurement follows the marked route, not arbitrary shortcuts.
+
 ## Minimal HUD and varied terrain update
 
 - All17 named code-level scenarios pass (4 core, 7 expansion, 6 terrain). Terrain checks cover sampled mesh heights, bounded slopes, sprint/dash/slide/jump/landing on grades, elevated and sunken goblin navigation, ridge ray obstruction, raised tower placement and preserving upgrades when a saved tower needs a nearby clear spot.
