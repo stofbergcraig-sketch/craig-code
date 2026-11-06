@@ -1,0 +1,43 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url = 'https://maven.minecraftforge.net' }
+    }
+    dependencies { classpath 'net.minecraftforge.gradle:ForgeGradle:2.1-SNAPSHOT' }
+}
+apply plugin: 'net.minecraftforge.gradle.forge'
+version = '0.1.0'
+group = 'dev.goatclient'
+archivesBaseName = 'GoatClient-1.8.9'
+sourceCompatibility = targetCompatibility = '1.8'
+compileJava.options.encoding = 'UTF-8'
+minecraft {
+    version = '1.8.9-11.15.1.2318-1.8.9'
+    runDir = 'run'
+    mappings = 'stable_22'
+    makeObfSourceJar = false
+}
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.minecraftforge.net' }
+}
+jar { from('LICENSE') }
+if (project.hasProperty('goatSmoke')) {
+    sourceSets.main.java.srcDir 'src/smoke/java'
+    minecraft.clientJvmArgs += ['-Dgoat.smoke=true']
+}
+
+// Mojang's current artifact endpoint serves the exact manifest-addressed objects.
+// Keep the manifest hashes as required checks, rather than accepting a renamed JAR.
+afterEvaluate {
+    [downloadClient: '3870888a6c3d349d3771a3e9d16c9bf5e076b908',
+     downloadServer: 'b58b2ceb36e01bcd8dbf49c8fb66c55a9f0676cd'].each { name, hash ->
+        def task = tasks.getByName(name)
+        def artifact = name == 'downloadClient' ? 'client' : 'server'
+        task.url = "https://piston-data.mojang.com/v1/objects/${hash}/${artifact}.jar"
+        task.doLast {
+            def actual = java.security.MessageDigest.getInstance('SHA-1').digest(task.output.bytes).encodeHex().toString()
+            if (actual != hash) throw new GradleException("Minecraft ${artifact} checksum mismatch")
+        }
+    }
+}

@@ -1,0 +1,69 @@
+PASS custom main menu loaded
+PASS 45 modules registered in Minecraft 1.8.9
+PASS fullbright changes gamma
+PASS fullbright restores gamma
+PASS zoom changes FOV
+PASS zoom restores FOV
+PASS step changes player height
+PASS step restores player height
+PASS auto-walk holds forward
+PASS auto-walk releases forward
+PASS sneak holds key
+PASS sneak releases key
+PASS profile round-trip inside Minecraft
+PASS freecam detaches render view
+PASS freecam restores render view
+PASS fly grants active vanilla flight in integrated world
+PASS ForceOP is authorised by owned integrated server
+PASS NoFall prevents real integrated-server fall damage
+PASS fall damage restored after disabling NoFall
+PASS vanilla respawn after fall baseline
+PASS waypoint add command stores a named location
+PASS waypoint file persisted
+PASS world rendered 40 ticks with HUD and entity overlays enabled
+PASS ClickGUI opened and rendered
+PASS disconnect disables sprint
+PASS disconnect disables sneak
+PASS disconnect disables auto-walk
+PASS disconnect disables step
+PASS disconnect disables safe-walk
+PASS disconnect disables parkour
+PASS disconnect disables bunny-hop
+PASS disconnect disables auto-jump
+PASS disconnect disables aim-assist
+PASS disconnect disables auto-clicker
+PASS disconnect disables trigger-bot
+PASS disconnect disables criticals
+PASS disconnect disables auto-sword
+PASS disconnect disables bow-assist
+PASS disconnect disables auto-block
+PASS disconnect disables reach-display
+PASS disconnect disables auto-tool
+PASS disconnect disables fast-place
+PASS disconnect disables auto-eat
+PASS disconnect disables auto-fish
+PASS disconnect disables auto-respawn
+PASS disconnect disables inventory-cleaner
+PASS disconnect disables chest-sorter
+PASS disconnect disables auto-armor
+PASS disconnect disables fullbright
+PASS disconnect disables freecam
+PASS disconnect disables tracers
+PASS disconnect disables esp
+PASS disconnect disables chest-esp
+PASS disconnect disables name-tags
+PASS disconnect disables hud
+PASS disconnect disables coordinates
+PASS disconnect disables zoom
+PASS disconnect disables no-hurt-cam
+PASS disconnect disables ore-prospector
+PASS disconnect disables nuker
+PASS disconnect disables scaffold-preview
+PASS disconnect disables timer-display
+PASS disconnect disables auto-mine
+PASS disconnect disables waypoints
+PASS disconnect disables force-op
+PASS disconnect disables jesus
+PASS disconnect disables fly
+PASS disconnect disables no-fall
+PASS disconnect disables spider

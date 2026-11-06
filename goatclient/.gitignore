@@ -1,0 +1,10 @@
+build/
+tools/*.jar
+tools/*.sha1
+.gradle/
+run/
+vendor/
+.gradle-home/
+
+.toolchains/
+release/
